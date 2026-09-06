@@ -1,0 +1,11 @@
+name,role,email,phone,location,on_call
+Felix Petrova,Engineering lead,felix.petrova15@files.example.com,+49 30 6313128,Remote,yes
+Noah Hansen,Storage engineer,noah.hansen@files.example.com,+49 30 3008107,Berlin,yes
+Nina Schmidt,Search engineer,nina.schmidt@files.example.com,+49 30 1425499,Limassol,yes
+Tom Georgiou,Security engineer,tom.georgiou@files.example.com,+49 30 5553971,Warsaw,yes
+Diego Popescu,Support lead,diego.popescu@files.example.com,+49 30 8006068,Berlin,no
+Kai Baker,Product manager,kai.baker20@files.example.com,+49 30 8197386,Remote,no
+Kai Meyer,Designer,kai.meyer@files.example.com,+49 30 7162146,Limassol,no
+Arjun Dubois,Solutions engineer,arjun.dubois@files.example.com,+49 30 6945200,Berlin,no
+Mia Kim,Finance,mia.kim@files.example.com,+49 30 7841441,Remote,no
+Liam Meyer,Office manager,liam.meyer@files.example.com,+49 30 6677878,Warsaw,no

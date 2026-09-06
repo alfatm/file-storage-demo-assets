@@ -1,0 +1,86 @@
+:root {
+  --fx-primary: #2563eb;
+  --fx-success: #10b981;
+  --fx-warning: #f59e0b;
+  --fx-bg: #f9fafb;
+  --fx-surface: #ffffff;
+  --fx-border: #e5e7eb;
+  --fx-text: #111827;
+  --fx-muted: #6b7280;
+  --fx-radius: 10px;
+}
+
+body {
+  margin: 0;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fx-text);
+  background: var(--fx-bg);
+}
+
+.fx-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.fx-sidebar {
+  background: #111827;
+  color: #fff;
+  padding: 24px 16px;
+}
+
+.fx-sidebar a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.fx-sidebar a.active {
+  background: var(--fx-primary);
+}
+
+.fx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
+
+.fx-tile {
+  background: var(--fx-surface);
+  border: 1px solid var(--fx-border);
+  border-radius: var(--fx-radius);
+  overflow: hidden;
+  transition: box-shadow 120ms ease;
+}
+
+.fx-tile:hover {
+  box-shadow: 0 4px 16px rgba(17, 24, 39, 0.08);
+}
+
+.fx-tile img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.fx-tile .name {
+  padding: 8px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fx-tile .meta {
+  padding: 0 12px 10px;
+  color: var(--fx-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .fx-layout { grid-template-columns: 1fr; }
+  .fx-sidebar { display: none; }
+}

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Cloud logo: folded-corner document with a bold F. Part of the Cloud design system. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="40" fill="url(#g)"/>
+  <path d="M84 56h88l36 36v108a12 12 0 0 1-12 12H84a12 12 0 0 1-12-12V68a12 12 0 0 1 12-12z" fill="#fff" opacity="0.95"/>
+  <path d="M172 56v36h36z" fill="#bfdbfe"/>
+  <path d="M104 96h60v16h-42v20h36v16h-36v36h-18z" fill="#1d4ed8"/>
+</svg>

@@ -1,0 +1,400 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Papadopoulos;Maya;;;
+FN:Maya Papadopoulos
+ORG:Lumen Retail
+TITLE:Support
+EMAIL;TYPE=WORK:maya.papadopoulos@lumenretail.example
+TEL;TYPE=WORK:+33 524 307074
+ADR;TYPE=WORK:;;;Latvia
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Ferrari;Diego;;;
+FN:Diego Ferrari
+ORG:Lumen Retail
+TITLE:Finance
+EMAIL;TYPE=WORK:diego.ferrari@lumenretail.example
+TEL;TYPE=WORK:+39 207 995678
+ADR;TYPE=WORK:;;;Czechia
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Costa;Omar;;;
+FN:Omar Costa
+ORG:Zephyr Travel
+TITLE:HR
+EMAIL;TYPE=WORK:omar.costa@zephyrtravel.example
+TEL;TYPE=WORK:+45 757 569600
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Fischer;Sofia;;;
+FN:Sofia Fischer
+ORG:Solstice Energy
+TITLE:Engineering
+EMAIL;TYPE=WORK:sofia.fischer@solsticeenergy.example
+TEL;TYPE=WORK:+30 668 417914
+ADR;TYPE=WORK:;;;Brazil
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Christou;Jonas;;;
+FN:Jonas Christou
+ORG:Lumen Retail
+TITLE:Legal
+EMAIL;TYPE=WORK:jonas.christou5@lumenretail.example
+TEL;TYPE=WORK:+34 986 726001
+ADR;TYPE=WORK:;;;Lithuania
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Nilsson;Kai;;;
+FN:Kai Nilsson
+ORG:Brightline Media
+TITLE:Product
+EMAIL;TYPE=WORK:kai.nilsson@brightlinemedia.example
+TEL;TYPE=WORK:+44 411 253807
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Schmidt;Jonas;;;
+FN:Jonas Schmidt
+ORG:Brightline Media
+TITLE:Engineering
+EMAIL;TYPE=WORK:jonas.schmidt@brightlinemedia.example
+TEL;TYPE=WORK:+36 953 149227
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Moreau;Maya;;;
+FN:Maya Moreau
+ORG:Zephyr Travel
+TITLE:Operations
+EMAIL;TYPE=WORK:maya.moreau@zephyrtravel.example
+TEL;TYPE=WORK:+42 986 689299
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Nakamura;Maya;;;
+FN:Maya Nakamura
+ORG:Kestrel Logistics
+TITLE:Product
+EMAIL;TYPE=WORK:maya.nakamura@kestrellogistics.example
+TEL;TYPE=WORK:+32 387 732078
+ADR;TYPE=WORK:;;;Sweden
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Schmidt;Zara;;;
+FN:Zara Schmidt
+ORG:Vanta Security
+TITLE:Marketing
+EMAIL;TYPE=WORK:zara.schmidt10@vantasecurity.example
+TEL;TYPE=WORK:+42 328 310572
+ADR;TYPE=WORK:;;;Greece
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Hansen;Lea;;;
+FN:Lea Hansen
+ORG:Kestrel Logistics
+TITLE:Product
+EMAIL;TYPE=WORK:lea.hansen@kestrellogistics.example
+TEL;TYPE=WORK:+39 164 660256
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Costa;Lea;;;
+FN:Lea Costa
+ORG:Lumen Retail
+TITLE:Design
+EMAIL;TYPE=WORK:lea.costa@lumenretail.example
+TEL;TYPE=WORK:+48 359 296298
+ADR;TYPE=WORK:;;;Germany
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Martin;Ivan;;;
+FN:Ivan Martin
+ORG:Helios Analytics
+TITLE:Operations
+EMAIL;TYPE=WORK:ivan.martin@heliosanalytics.example
+TEL;TYPE=WORK:+32 272 210082
+ADR;TYPE=WORK:;;;United Kingdom
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Christou;Omar;;;
+FN:Omar Christou
+ORG:Northwind Labs
+TITLE:Support
+EMAIL;TYPE=WORK:omar.christou@northwindlabs.example
+TEL;TYPE=WORK:+31 133 936237
+ADR;TYPE=WORK:;;;Italy
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Ivanov;Mia;;;
+FN:Mia Ivanov
+ORG:Helios Analytics
+TITLE:Operations
+EMAIL;TYPE=WORK:mia.ivanov15@heliosanalytics.example
+TEL;TYPE=WORK:+46 151 386535
+ADR;TYPE=WORK:;;;Estonia
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Lindqvist;Marco;;;
+FN:Marco Lindqvist
+ORG:Orbit Studio
+TITLE:Finance
+EMAIL;TYPE=WORK:marco.lindqvist@orbitstudio.example
+TEL;TYPE=WORK:+38 123 863379
+ADR;TYPE=WORK:;;;Brazil
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Andersen;Maya;;;
+FN:Maya Andersen
+ORG:Redwood Robotics
+TITLE:Marketing
+EMAIL;TYPE=WORK:maya.andersen@redwoodrobotics.example
+TEL;TYPE=WORK:+32 916 295883
+ADR;TYPE=WORK:;;;Poland
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Novak;Lea;;;
+FN:Lea Novak
+ORG:Pinecone Health
+TITLE:Marketing
+EMAIL;TYPE=WORK:lea.novak@pineconehealth.example
+TEL;TYPE=WORK:+35 895 756881
+ADR;TYPE=WORK:;;;Lithuania
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Hansen;Kai;;;
+FN:Kai Hansen
+ORG:Zephyr Travel
+TITLE:Sales
+EMAIL;TYPE=WORK:kai.hansen@zephyrtravel.example
+TEL;TYPE=WORK:+47 541 285093
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Martin;Lucas;;;
+FN:Lucas Martin
+ORG:Orbit Studio
+TITLE:Design
+EMAIL;TYPE=WORK:lucas.martin20@orbitstudio.example
+TEL;TYPE=WORK:+33 376 320557
+ADR;TYPE=WORK:;;;Czechia
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Kim;Ava;;;
+FN:Ava Kim
+ORG:Brightline Media
+TITLE:Sales
+EMAIL;TYPE=WORK:ava.kim@brightlinemedia.example
+TEL;TYPE=WORK:+31 450 901493
+ADR;TYPE=WORK:;;;France
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Moreau;Nina;;;
+FN:Nina Moreau
+ORG:Helios Analytics
+TITLE:Engineering
+EMAIL;TYPE=WORK:nina.moreau@heliosanalytics.example
+TEL;TYPE=WORK:+43 841 987506
+ADR;TYPE=WORK:;;;Poland
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Dubois;Lucas;;;
+FN:Lucas Dubois
+ORG:Zephyr Travel
+TITLE:Sales
+EMAIL;TYPE=WORK:lucas.dubois@zephyrtravel.example
+TEL;TYPE=WORK:+35 312 264433
+ADR;TYPE=WORK:;;;Germany
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Moreau;Lucas;;;
+FN:Lucas Moreau
+ORG:Quartz Financial
+TITLE:Sales
+EMAIL;TYPE=WORK:lucas.moreau@quartzfinancial.example
+TEL;TYPE=WORK:+34 259 944749
+ADR;TYPE=WORK:;;;Cyprus
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Christou;Sofia;;;
+FN:Sofia Christou
+ORG:Pinecone Health
+TITLE:Operations
+EMAIL;TYPE=WORK:sofia.christou25@pineconehealth.example
+TEL;TYPE=WORK:+39 403 988131
+ADR;TYPE=WORK:;;;Latvia
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Berg;Noah;;;
+FN:Noah Berg
+ORG:Willow Learning
+TITLE:Marketing
+EMAIL;TYPE=WORK:noah.berg@willowlearning.example
+TEL;TYPE=WORK:+38 144 806439
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Costa;Marco;;;
+FN:Marco Costa
+ORG:Orbit Studio
+TITLE:Engineering
+EMAIL;TYPE=WORK:marco.costa@orbitstudio.example
+TEL;TYPE=WORK:+30 214 521792
+ADR;TYPE=WORK:;;;Greece
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Christou;Liam;;;
+FN:Liam Christou
+ORG:Kestrel Logistics
+TITLE:Design
+EMAIL;TYPE=WORK:liam.christou@kestrellogistics.example
+TEL;TYPE=WORK:+38 532 375044
+ADR;TYPE=WORK:;;;Brazil
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Georgiou;Hugo;;;
+FN:Hugo Georgiou
+ORG:Acme Cloud
+TITLE:HR
+EMAIL;TYPE=WORK:hugo.georgiou@acmecloud.example
+TEL;TYPE=WORK:+39 663 535764
+ADR;TYPE=WORK:;;;Germany
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Kim;Tom;;;
+FN:Tom Kim
+ORG:Kestrel Logistics
+TITLE:HR
+EMAIL;TYPE=WORK:tom.kim30@kestrellogistics.example
+TEL;TYPE=WORK:+49 809 164298
+ADR;TYPE=WORK:;;;Canada
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Meyer;Lea;;;
+FN:Lea Meyer
+ORG:Kestrel Logistics
+TITLE:Finance
+EMAIL;TYPE=WORK:lea.meyer@kestrellogistics.example
+TEL;TYPE=WORK:+39 844 557548
+ADR;TYPE=WORK:;;;Brazil
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Ivanov;Petra;;;
+FN:Petra Ivanov
+ORG:Brightline Media
+TITLE:Finance
+EMAIL;TYPE=WORK:petra.ivanov@brightlinemedia.example
+TEL;TYPE=WORK:+41 436 533256
+ADR;TYPE=WORK:;;;Italy
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Lindqvist;Andrei;;;
+FN:Andrei Lindqvist
+ORG:Willow Learning
+TITLE:Engineering
+EMAIL;TYPE=WORK:andrei.lindqvist@willowlearning.example
+TEL;TYPE=WORK:+39 479 443408
+ADR;TYPE=WORK:;;;Estonia
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Weber;Sara;;;
+FN:Sara Weber
+ORG:Zephyr Travel
+TITLE:Sales
+EMAIL;TYPE=WORK:sara.weber@zephyrtravel.example
+TEL;TYPE=WORK:+33 809 856943
+ADR;TYPE=WORK:;;;Sweden
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Rossi;Lucas;;;
+FN:Lucas Rossi
+ORG:Vanta Security
+TITLE:HR
+EMAIL;TYPE=WORK:lucas.rossi35@vantasecurity.example
+TEL;TYPE=WORK:+33 533 692896
+ADR;TYPE=WORK:;;;Sweden
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Hansen;Felix;;;
+FN:Felix Hansen
+ORG:Lumen Retail
+TITLE:Engineering
+EMAIL;TYPE=WORK:felix.hansen@lumenretail.example
+TEL;TYPE=WORK:+48 136 821436
+ADR;TYPE=WORK:;;;Sweden
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Hansen;Liam;;;
+FN:Liam Hansen
+ORG:Lumen Retail
+TITLE:Engineering
+EMAIL;TYPE=WORK:liam.hansen@lumenretail.example
+TEL;TYPE=WORK:+36 263 704118
+ADR;TYPE=WORK:;;;Lithuania
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Martin;Maya;;;
+FN:Maya Martin
+ORG:Lumen Retail
+TITLE:Legal
+EMAIL;TYPE=WORK:maya.martin@lumenretail.example
+TEL;TYPE=WORK:+32 339 631558
+ADR;TYPE=WORK:;;;Lithuania
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Georgiou;Lucas;;;
+FN:Lucas Georgiou
+ORG:Vanta Security
+TITLE:Design
+EMAIL;TYPE=WORK:lucas.georgiou@vantasecurity.example
+TEL;TYPE=WORK:+49 899 741207
+ADR;TYPE=WORK:;;;Latvia
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+N:Dubois;Diego;;;
+FN:Diego Dubois
+ORG:Lumen Retail
+TITLE:Operations
+EMAIL;TYPE=WORK:diego.dubois40@lumenretail.example
+TEL;TYPE=WORK:+35 171 590760
+ADR;TYPE=WORK:;;;Cyprus
+END:VCARD

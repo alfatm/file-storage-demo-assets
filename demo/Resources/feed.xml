@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+<title>Cloud Blog</title>
+<link>https://files.example.com/blog</link>
+<description>Product news from the Cloud team</description>
+<language>en</language>
+<item><title>Cloud 2.0 released with sharing and content search</title><link>https://files.example.com/blog/2026-07-24</link><pubDate>Fri, 24 Jul 2026 09:00:00 +0000</pubDate><description>Share links with PIN and expiry, full-text search for PDF and DOCX, and a WebDAV backend.</description></item>
+<item><title>Opening our Cyprus engineering hub</title><link>https://files.example.com/blog/2026-07-15</link><pubDate>Wed, 15 Jul 2026 09:00:00 +0000</pubDate><description>The search and storage teams are moving to a new office in Limassol this September.</description></item>
+<item><title>Migration plan for legacy WebDAV shares</title><link>https://files.example.com/blog/2026-07-06</link><pubDate>Mon, 06 Jul 2026 09:00:00 +0000</pubDate><description>How we are moving 38 workspaces to managed S3 storage without downtime.</description></item>
+<item><title>Q2 2026 quarterly report</title><link>https://files.example.com/blog/2026-07-01</link><pubDate>Wed, 01 Jul 2026 09:00:00 +0000</pubDate><description>Quarterly revenue up 18 percent, storage costs per terabyte down 9 percent.</description></item>
+<item><title>Security review: what we found and what we changed</title><link>https://files.example.com/blog/2026-06-20</link><pubDate>Sat, 20 Jun 2026 09:00:00 +0000</pubDate><description>Two-factor enforcement for administrators and API token expiry by default.</description></item>
+</channel></rss>

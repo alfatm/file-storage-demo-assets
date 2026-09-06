@@ -1,0 +1,33 @@
+INCIDENT REPORT INC-2026-031
+============================
+
+Title:        Thumbnail generation backlog after bulk photo import
+Severity:     S3 (degraded)
+Started:      2026-06-27 09:14 UTC
+Resolved:     2026-06-27 11:52 UTC
+Owner:        Marco Rossi
+
+SUMMARY
+-------
+A customer imported 140,000 photographs over WebDAV in one batch. The
+thumbnail worker processed them sequentially and fell 2.5 hours behind,
+so newly uploaded files showed generic icons in the grid view.
+
+TIMELINE
+--------
+09:14  Import starts; queue depth alert fires at 20,000 jobs
+09:31  On-call acknowledges, confirms no data loss
+10:05  Worker concurrency raised from 2 to 8 on the production host
+11:20  Queue depth below 5,000
+11:52  Queue drained; incident closed
+
+ROOT CAUSE
+----------
+Worker concurrency was sized for interactive uploads, not bulk imports.
+No backpressure existed between the WebDAV endpoint and the worker queue.
+
+ACTIONS
+-------
+- Autoscale thumbnail workers on queue depth (done 2026-07-01)
+- Prioritise thumbnails for folders a user is currently viewing (in progress)
+- Document bulk import guidance in the Engineering Handbook

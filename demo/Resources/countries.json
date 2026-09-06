@@ -1,0 +1,159 @@
+{
+  "generated": "2026-07-01",
+  "count": 17,
+  "countries": [
+    {
+      "code": "CY",
+      "name": "Cyprus",
+      "capital": "Nicosia",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 1260000,
+      "office": "Limassol"
+    },
+    {
+      "code": "DE",
+      "name": "Germany",
+      "capital": "Berlin",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 84500000,
+      "office": "Berlin"
+    },
+    {
+      "code": "NL",
+      "name": "Netherlands",
+      "capital": "Amsterdam",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 17900000,
+      "office": null
+    },
+    {
+      "code": "PL",
+      "name": "Poland",
+      "capital": "Warsaw",
+      "region": "Europe",
+      "currency": "PLN",
+      "population": 37600000,
+      "office": "Warsaw"
+    },
+    {
+      "code": "IT",
+      "name": "Italy",
+      "capital": "Rome",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 58900000,
+      "office": null
+    },
+    {
+      "code": "ES",
+      "name": "Spain",
+      "capital": "Madrid",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 48300000,
+      "office": null
+    },
+    {
+      "code": "FR",
+      "name": "France",
+      "capital": "Paris",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 68200000,
+      "office": null
+    },
+    {
+      "code": "SE",
+      "name": "Sweden",
+      "capital": "Stockholm",
+      "region": "Europe",
+      "currency": "SEK",
+      "population": 10500000,
+      "office": null
+    },
+    {
+      "code": "PT",
+      "name": "Portugal",
+      "capital": "Lisbon",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 10400000,
+      "office": null
+    },
+    {
+      "code": "GR",
+      "name": "Greece",
+      "capital": "Athens",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 10400000,
+      "office": null
+    },
+    {
+      "code": "GB",
+      "name": "United Kingdom",
+      "capital": "London",
+      "region": "Europe",
+      "currency": "GBP",
+      "population": 67600000,
+      "office": "London"
+    },
+    {
+      "code": "IE",
+      "name": "Ireland",
+      "capital": "Dublin",
+      "region": "Europe",
+      "currency": "EUR",
+      "population": 5200000,
+      "office": null
+    },
+    {
+      "code": "US",
+      "name": "United States",
+      "capital": "Washington",
+      "region": "Americas",
+      "currency": "USD",
+      "population": 335000000,
+      "office": "Austin"
+    },
+    {
+      "code": "CA",
+      "name": "Canada",
+      "capital": "Ottawa",
+      "region": "Americas",
+      "currency": "CAD",
+      "population": 40100000,
+      "office": null
+    },
+    {
+      "code": "JP",
+      "name": "Japan",
+      "capital": "Tokyo",
+      "region": "Asia",
+      "currency": "JPY",
+      "population": 124000000,
+      "office": null
+    },
+    {
+      "code": "AU",
+      "name": "Australia",
+      "capital": "Canberra",
+      "region": "Oceania",
+      "currency": "AUD",
+      "population": 26600000,
+      "office": null
+    },
+    {
+      "code": "BR",
+      "name": "Brazil",
+      "capital": "Brasília",
+      "region": "Americas",
+      "currency": "BRL",
+      "population": 216000000,
+      "office": null
+    }
+  ]
+}

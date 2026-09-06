@@ -1,0 +1,43 @@
+# Cloud demo configuration
+server:
+  listen: 0.0.0.0:5212
+  base_url: https://files.example.com
+  trust_proxy_headers: true
+
+storage:
+  default: photos
+  backends:
+    photos:
+      type: s3
+      bucket: cloud-demo-photos
+      region: eu-central-1
+      endpoint: https://s3.eu-central-1.amazonaws.com
+      multipart_part_size: 8MiB
+    documents:
+      type: local
+      root: /srv/cloud/documents
+    nas:
+      type: webdav
+      url: https://nas.internal/dav
+      username: cloud
+      password_env: CLOUD_WEBDAV_PASSWORD
+
+search:
+  content_indexing: true
+  extractors: [pdf, docx, md, txt, html, xlsx]
+  max_document_bytes: 50MiB
+
+thumbnails:
+  sizes: [128, 256, 512]
+  quality: 82
+  workers: 8
+
+sharing:
+  default_expiry_days: 30
+  require_pin: false
+  max_downloads: 1000
+
+auth:
+  session_ttl_hours: 72
+  api_token_ttl_days: 90
+  require_2fa_for_admins: true

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Cloud API Specification</title>
+<style>body{font:15px/1.6 system-ui,sans-serif;max-width:820px;margin:40px auto;color:#1f2937}h1{color:#2563eb}code,pre{background:#f3f4f6;padding:2px 6px;border-radius:4px}pre{padding:12px;overflow:auto}</style>
+</head><body>
+<h1>Cloud API Specification</h1>
+<h2>Authentication</h2>
+<p>Every request must carry an API token in the Authorization header. Tokens are created on the account page, start with the prefix fx_ and are shown only once. A token is scoped to a folder prefix and expires after ninety days unless configured otherwise.</p>
+<pre>Authorization: Bearer fx_9K2mV…</pre>
+<p>Requests without a valid API token receive 401 with a JSON body containing an error field.</p>
+<h2>List a folder</h2>
+<pre>GET /api/files?path=/Documents</pre>
+<p>Returns an entries array. Each entry has path, name, size, isDir, modifiedAt and, for files, mime.</p>
+<h2>Upload</h2>
+<pre>POST /api/upload  (multipart/form-data: path, file, overwrite)</pre>
+<p>Files larger than 8 MiB should use the multipart endpoints /api/upload/init, /api/upload/part and /api/upload/complete so interrupted transfers can resume.</p>
+<h2>Download</h2>
+<pre>GET /api/download?path=/Photos/fjord.jpg</pre>
+<p>Streams the file with the sniffed content type. Range requests are supported for video and audio previews.</p>
+<h2>Search</h2>
+<pre>GET /api/search?q=roadmap&path=/Documents&content=1&limit=20</pre>
+<p>Matches file names and, when content=1, extracted document text. Results are ordered by score and limited to the requested count.</p>
+<h2>Errors</h2>
+<p>Errors use conventional status codes: 400 for invalid input, 401 for missing authentication, 403 for a token outside its scope, 404 for unknown paths, 409 for an existing file without overwrite, 413 for files above the upload limit.</p>
+</body></html>

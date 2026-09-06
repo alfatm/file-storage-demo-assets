@@ -1,0 +1,9 @@
+Hello from Cloud!
+
+This is a plain text file. Open it to see the text preview, or use the
+search box to find it by content: try searching for "quick start".
+
+Quick start:
+  1. Drag a file onto the grid to upload it.
+  2. Right-click a file to rename, move, share or delete it.
+  3. Press Ctrl+F to search the current folder.

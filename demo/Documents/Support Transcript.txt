@@ -1,0 +1,19 @@
+Support transcript #48213
+Customer: Quartz Financial (workspace qf-eu)
+Agent: Nina Larsen
+Date: 2026-07-02
+
+[10:02] Customer: Hi, our finance team cannot find the invoice PDFs from
+        March. Searching "invoice" returns nothing.
+[10:03] Agent: Thanks for reaching out. Was content search enabled for the
+        workspace? It is off by default on the Team plan.
+[10:05] Customer: I do not think so. Where do I enable it?
+[10:05] Agent: Settings > Search > Index file contents. The initial index
+        for your workspace should take about twenty minutes.
+[10:31] Customer: Enabled. Searching "invoice" now shows 212 files. Thanks!
+[10:32] Agent: Great. You can also filter by type PDF and date range March
+        2026 to narrow it down. Anything else I can help with?
+[10:33] Customer: No, that is all. Have a good day.
+
+Resolution: content search was disabled; enabled by customer admin.
+Tags: search, onboarding, invoices
