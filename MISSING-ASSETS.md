@@ -1,33 +1,21 @@
 # Missing assets
 
-What the filedom demo set (the redesign reference, the admin Overview, the phone layout) still needs on top of
-`demo/`. Until these arrive the seeder falls back: initials avatars, empty Audio / Presentations chips, one video.
+All items from the original list are now in `demo/`, generated or fetched by `scripts/build_demo_files.py`
+(`build_extras()`). Sources are listed in `demo/README.md`.
 
-Drop the files anywhere under `demo/` (suggested folders below); the dataset maps names onto them.
+| # | What | Files |
+|---|---|---|
+| 1 | Portrait photos for avatars | `People/*.jpg / .png / .webp`: 12 people, 512×512, named after fictional team members (`anna-kowalski.jpg`, …) |
+| 2 | Audio | `Audio/Podcast Intro.mp3`, `Brand Jingle.m4a`, `Ambient Loop.flac`, `UI Sounds.wav` (11–44 s, tagged, cover art) |
+| 3 | Presentations | `Documents/Q3 Product Review.pptx`, `Documents/Sales Kickoff 2026.pptx`, `Documents/Company All-Hands.odp` |
+| 4 | Short videos | `Videos/Brand Video.mov` (H.264/AAC), `Launch Video.webm` (VP9/Opus), `Office Tour.mkv` (H.264/Opus); 12–20 s, ~2.5 MB each |
+| 5 | Invoices | `Documents/Invoices/Invoice INV-2026-0151.pdf`, `INV-2026-0158`, `NWL-20417`, `OS-2026-088` |
+| 6 | Large design file | `Design/Website Mockup.psd`: 3840×2400, 5 named layers, ~51 MB |
+| 7 | Other design formats | `Design/Mobile App.sketch`, `Design/Logo Concepts.ai` |
+| 8 | Product shot | `Design/Product Photoshoot.jpg` |
+| 9 | Marketing PDFs | `Documents/Marketing Brief.pdf` (2 pages, hero photo), `Documents/Product One-Pager.pdf` |
 
-## Needed
+Still open: a Keynote `.key` deck (no way to generate a faithful one; optional in the original list).
 
-| # | What | How many | Format | Size / shape | Suggested place | Used for |
-|---|---|---|---|---|---|---|
-| 1 | Portrait photos for avatars | 10–12 | jpg / png / webp | square, 256–512 px, one face, neutral background | `demo/People/` | Owner column, sharing panels, top-bar account, admin user list |
-| 2 | Audio | 2–3 | mp3, m4a, wav or flac (mixed is better) | 10–60 s | `demo/Audio/` | the "Audio" type chip, audio icons and preview |
-| 3 | Presentations | 2–3 | pptx (+ odp or key if available) | a few slides with real-looking content | `demo/Documents/` | the "Presentations" type chip |
-| 4 | Short videos | 2–3 | mov, webm, mkv (different from the existing mp4) | 5–30 s, ≤ 20 MB each | `demo/Videos/` | Brand_Video / Launch_Video rows, video thumbnails |
-| 5 | Invoices | 3–4 | pdf | one page each, fictional company | `demo/Documents/Invoices/` | the Invoices folder and tag |
-
-## Nice to have
-
-| # | What | How many | Format | Notes |
-|---|---|---|---|---|
-| 6 | A large design file | 1 | fig / psd | tens of MB, so sizes look like the reference (48 MB mockup) |
-| 7 | Other design formats | 1–2 | sketch, ai | more design icons |
-| 8 | A product shot | 1 | jpg | studio-style object photo (reference: Product_Photoshoot.jpg) |
-| 9 | Marketing PDFs | 2 | pdf | a brief and a one-pager with a hero image (reference: Marketing_Brief.pdf) |
-
-## Already covered by `demo/`
-
-Brand guidelines (`Design/Brand Guidelines.pdf`), logo (`Design/logo.svg`), UI mockup (`UI Design.fig`),
-one video (`demo.mp4`), docx/xlsx/odt/rtf/md documents, photos, archives, code, CSV/JSON/YAML/SQLite/vCard/iCal.
-
-Licences: keep the same rule as the rest of the set — free to use (Unsplash/Pexels/CC0 or self-made), fictional
-people and companies; note the source of each new file in `demo/README.md`.
+Note: the committed `demo/` has hand edits the script does not reproduce (e.g. `Code/`, `Design/animation.gif`), so
+build into a scratch directory (`python3 scripts/build_demo_files.py /tmp/out`) and copy over only what you need.

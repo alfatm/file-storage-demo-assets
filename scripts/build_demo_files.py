@@ -3,15 +3,17 @@
 Build the `demo/` sample filesystem used to showcase Cloud.
 
 Idempotent: re-running rebuilds every folder it owns (Code, Design, Documents,
-Photos, example, Archive, Resources, Shared) and the root demo files. Files in
-`demo/` that this script does not know about are left alone.
+Photos, example, Archive, Resources, Shared, People, Audio, Videos) and the root
+demo files. Files in `demo/` that this script does not know about are left alone.
 
 Sources (cloned/downloaded into DEMO_SRC_DIR, default /tmp/cloud-demo-src):
   - https://github.com/RNKushwaha/sample-files       (binary fixtures)
   - https://github.com/GuglielmoCerri/test-assets    (binary fixtures)
   - https://picsum.photos                             (Unsplash photographs)
+  - https://images.unsplash.com                       (avatars, product shot)
 
-Python dependencies:  pip install pillow reportlab openpyxl python-docx
+Python dependencies:  pip install pillow reportlab openpyxl python-docx python-pptx numpy
+Tools on PATH:        ffmpeg (audio, video), magick (layered PSD)
 
 Usage:
   DEMO_SRC_DIR=/some/cache python3 scripts/build_demo_files.py [OUT_DIR]
@@ -20,7 +22,9 @@ Usage:
 from __future__ import annotations
 
 import csv
+import functools
 import io
+import itertools
 import json
 import os
 import random
@@ -28,12 +32,15 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import urllib.request
+import uuid
 import zipfile
 import zlib
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 REPO = Path(__file__).resolve().parent.parent
@@ -42,8 +49,10 @@ SRC = Path(os.environ.get("DEMO_SRC_DIR", "/tmp/cloud-demo-src"))
 SF = SRC / "sample-files"
 TA = SRC / "test-assets"
 PICSUM = SRC / "picsum"
+UNSPLASH = SRC / "unsplash"
 
-FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
+# Debian/Ubuntu path first, Arch/Fedora layout as a fallback.
+FONT_DIR = next((d for d in (Path("/usr/share/fonts/truetype/dejavu"), Path("/usr/share/fonts/TTF")) if (d / "DejaVuSans.ttf").exists()), Path("/usr/share/fonts/truetype/dejavu"))
 FONT_REGULAR = FONT_DIR / "DejaVuSans.ttf"
 FONT_BOLD = FONT_DIR / "DejaVuSans-Bold.ttf"
 
@@ -89,6 +98,25 @@ BEACH_ID = 1061
 ILLUSTRATION_ID = 1069  # jellyfish, used for Design/illustration.webp
 ALL_PICSUM_IDS = [i for i, _ in PHOTOS] + [BEACH_ID, ILLUSTRATION_ID]
 
+# Unsplash photo ids (Unsplash License) -> avatar in People/. The models are
+# real people; the names are fictional and taken from FIRST / LAST below.
+PEOPLE = [
+    ("1438761681033-6461ffad8d80", "anna-kowalski.jpg"),
+    ("1494790108377-be9c29b29330", "elena-petrova.jpg"),
+    ("1524504388940-b1c1722653e1", "sofia-andersen.webp"),
+    ("1534528741775-53994a69daeb", "mia-nakamura.png"),
+    ("1544005313-94ddf0286df2", "chloe-dubois.jpg"),
+    ("1580489944761-15a19d654956", "julia-weber.jpg"),
+    ("1500648767791-00dcc994a43e", "marco-rossi.jpg"),
+    ("1472099645785-5658abf4ff4e", "tom-schmidt.jpg"),
+    ("1507003211169-0a1dd7228f2d", "lucas-costa.webp"),
+    ("1506794778202-cad84cf45f1d", "noah-fischer.png"),
+    ("1599566150163-29194dcaad36", "felix-berg.jpg"),
+    ("1633332755192-727a05c4013d", "jonas-lindqvist.jpg"),
+]
+PRODUCT_PHOTO_ID = "1505740420928-5e560c06d30e"  # headphones on yellow -> Design/Product Photoshoot.jpg
+UNSPLASH_CROPS = [(uid, "w=512&h=512&fit=crop&crop=faces") for uid, _ in PEOPLE] + [(PRODUCT_PHOTO_ID, "w=1600&h=1200&fit=crop")]
+
 rng = random.Random(20260706)
 
 
@@ -112,6 +140,13 @@ def ensure_sources() -> None:
             continue
         print(f"downloading picsum {pid}")
         urllib.request.urlretrieve(f"https://picsum.photos/id/{pid}/1600/1000", dest)
+    UNSPLASH.mkdir(exist_ok=True)
+    for uid, crop in UNSPLASH_CROPS:
+        dest = UNSPLASH / f"{uid}.jpg"
+        if dest.exists() and dest.stat().st_size > 0:
+            continue
+        print(f"downloading unsplash {uid}")
+        urllib.request.urlretrieve(f"https://images.unsplash.com/photo-{uid}?{crop}&q=85&fm=jpg", dest)
 
 
 # ---------------------------------------------------------------------------
@@ -707,8 +742,12 @@ sharing. Every file is a real, decodable file of its type.
 | Folder        | Contents                                                     |
 |---------------|--------------------------------------------------------------|
 | `Code/`       | A small TypeScript / Python / Go service with its config      |
-| `Design/`     | Mockups, a logo, an illustration, a PSD source and brand PDF  |
-| `Documents/`  | PDF, DOCX, ODT, RTF, HTML, Markdown and text documents        |
+| `Design/`     | Mockups, logo, illustration, PSD / Sketch / AI, brand PDF     |
+| `Documents/`  | PDF, DOCX, ODT, RTF, HTML, Markdown, PPTX and ODP documents   |
+| `Documents/Invoices/` | Four one-page PDF invoices                            |
+| `People/`     | Twelve avatar portraits for the fictional team                |
+| `Audio/`      | Original music and UI sounds in MP3, M4A, FLAC and WAV        |
+| `Videos/`     | Short clips in MOV, WebM and MKV                              |
 | `Photos/`     | 56 photographs in JPG, PNG and WebP                           |
 | `example/`    | The three tiny files used in the quick-start tutorial         |
 | `Archive/`    | ZIP, TAR, 7z, gzip, bzip2, xz and other archive formats       |
@@ -724,7 +763,8 @@ a CSV with a few thousand fake users and this README.
 - **Grid view.** Open `Photos/` and switch to the grid. Thumbnails are
   generated on first view and cached next to the original object.
 - **Previews.** Click `overview.pdf`, `app.ts`, `demo.mp4` or `data.csv`.
-  Each one opens in a preview that matches the file type.
+  Each one opens in a preview that matches the file type. `Audio/` and
+  `Videos/` cover the other common audio and video containers.
 - **Content search.** Search for `storage architecture`, `authentication`,
   `S3`, `WebDAV`, `API token`, `migration plan`, `project roadmap`, `invoice`,
   `design system`, `Cyprus` or `quarterly revenue`. Each term lives in a
@@ -739,14 +779,38 @@ All people, companies, invoices and figures are fictional. Photographs come
 from Unsplash via Lorem Picsum. Binary fixtures for exotic formats come from
 the open `sample-files` and `test-assets` repositories on GitHub.
 
+Sources of the newer files:
+
+- `People/` and `Design/Product Photoshoot.jpg` are Unsplash photos under the
+  Unsplash License, cropped by the Unsplash image CDN. The names are fictional
+  and not those of the people pictured.
+  - `People/anna-kowalski.jpg`: `https://images.unsplash.com/photo-1438761681033-6461ffad8d80`
+  - `People/elena-petrova.jpg`: `https://images.unsplash.com/photo-1494790108377-be9c29b29330`
+  - `People/sofia-andersen.webp`: `https://images.unsplash.com/photo-1524504388940-b1c1722653e1`
+  - `People/mia-nakamura.png`: `https://images.unsplash.com/photo-1534528741775-53994a69daeb`
+  - `People/chloe-dubois.jpg`: `https://images.unsplash.com/photo-1544005313-94ddf0286df2`
+  - `People/julia-weber.jpg`: `https://images.unsplash.com/photo-1580489944761-15a19d654956`
+  - `People/marco-rossi.jpg`: `https://images.unsplash.com/photo-1500648767791-00dcc994a43e`
+  - `People/tom-schmidt.jpg`: `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e`
+  - `People/lucas-costa.webp`: `https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d`
+  - `People/noah-fischer.png`: `https://images.unsplash.com/photo-1506794778202-cad84cf45f1d`
+  - `People/felix-berg.jpg`: `https://images.unsplash.com/photo-1599566150163-29194dcaad36`
+  - `People/jonas-lindqvist.jpg`: `https://images.unsplash.com/photo-1633332755192-727a05c4013d`
+  - `Design/Product Photoshoot.jpg`: `https://images.unsplash.com/photo-1505740420928-5e560c06d30e`
+- `Audio/` and the soundtracks in `Videos/` are original music synthesised by
+  the build script.
+- `Videos/` are rendered by the build script from the demo photos and mockups.
+- The presentations, invoices, marketing PDFs, `Website Mockup.psd`,
+  `Mobile App.sketch` and `Logo Concepts.ai` are generated by the build script.
+
 ## Rebuilding
 
 The dataset is generated by `scripts/build_demo_files.py`. Rebuilding is
 deterministic: the same script produces the same names, contents and dates.
 
 ```bash
-pip install pillow reportlab openpyxl python-docx
-python3 scripts/build_demo_files.py
+pip install pillow reportlab openpyxl python-docx python-pptx numpy
+python3 scripts/build_demo_files.py   # needs ffmpeg and ImageMagick (magick) on PATH
 ```
 
 ## Usage
@@ -2036,6 +2100,1115 @@ def stamp_folders() -> None:
         stamp(OUT / folder, random_date())
 
 
+# ---------------------------------------------------------------------------
+# Extras: avatars, audio, video, presentations, invoices, marketing PDFs and
+# heavier design files. Built after stamp_folders() so the shared RNG sequence,
+# and with it every file above, is unchanged by their addition.
+# ---------------------------------------------------------------------------
+
+@functools.cache
+def draw_logo(size: int) -> Image.Image:
+    # Raster twin of LOGO_SVG on its 256-unit grid, drawn 4x and downsampled.
+    k = size * 4 / 256
+
+    def pts(*xy: tuple[int, int]) -> list[tuple[float, float]]:
+        return [(x * k, y * k) for x, y in xy]
+
+    im = Image.new("RGBA", (size * 4, size * 4), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([16 * k, 16 * k, 240 * k, 240 * k], 40 * k, fill="#2563eb")
+    d.polygon(pts((72, 56), (172, 56), (208, 92), (208, 212), (72, 212)), fill="#ffffff")
+    d.polygon(pts((172, 56), (172, 92), (208, 92)), fill="#bfdbfe")
+    d.polygon(pts((104, 96), (164, 96), (164, 112), (122, 112), (122, 132), (158, 132), (158, 148), (122, 148), (122, 184), (104, 184)), fill="#1d4ed8")
+    return im.resize((size, size), Image.LANCZOS)
+
+
+def gradient(size: tuple[int, int], top: str, bottom: str) -> Image.Image:
+    mask = Image.linear_gradient("L").resize(size)
+    return Image.composite(Image.new("RGB", size, bottom), Image.new("RGB", size, top), mask)
+
+
+def fade_alpha(layer: Image.Image, a: float) -> Image.Image:
+    layer.putalpha(layer.getchannel("A").point(lambda v: int(v * a)))
+    return layer
+
+
+def build_people() -> list[Path]:
+    d = reset_dir(OUT / "People")
+    for uid, name in PEOPLE:
+        src = UNSPLASH / f"{uid}.jpg"
+        if name.endswith(".jpg"):
+            copy(src, d / name)
+        else:
+            Image.open(src).save(d / name, quality=88)
+    return sorted(d.iterdir())
+
+
+# --- Audio -----------------------------------------------------------------
+# A tiny additive synth: every track is a list of note events rendered with
+# numpy, then encoded by ffmpeg. All music here is original and self-made.
+
+SR = 44100
+SEMITONES = {"C": -9, "D": -7, "E": -5, "F": -4, "G": -2, "A": 0, "B": 2}
+# Bass root first, then the chord tones used for arpeggios and pads.
+CHORDS = {
+    "C": ["C3", "C4", "E4", "G4"], "G": ["G2", "G3", "B3", "D4"], "Am": ["A2", "A3", "C4", "E4"],
+    "F": ["F2", "F3", "A3", "C4"], "Em": ["E2", "E3", "G3", "B3"], "Dm": ["D3", "D4", "F4", "A4"],
+}
+Event = tuple[float, str, str, float, float]  # start (s), voice, note, length (s), gain
+
+
+def hz(note: str) -> float:
+    pitch, octave = note[:-1], int(note[-1])
+    semis = SEMITONES[pitch[0]] + pitch.count("#") - pitch.count("b") + (octave - 4) * 12
+    return 440.0 * 2 ** (semis / 12)
+
+
+def octave_up(note: str) -> str:
+    return note[:-1] + str(int(note[-1]) + 1)
+
+
+def voice(kind: str, note: str, length: float) -> np.ndarray:
+    t = np.arange(int(length * SR)) / SR
+    w = 2 * np.pi * (hz(note) if note else 0.0) * t
+    release = 0.05
+    if kind == "pluck":
+        wave, env = sum(np.sin(w * n) / n ** 1.5 for n in (1, 2, 3, 4)), np.exp(-t * 5)
+    elif kind == "bell":
+        wave, env = np.sin(w + 1.6 * np.exp(-t * 3) * np.sin(w * 3.5)), np.exp(-t * 2.2)
+    elif kind == "pad":
+        wave = sum(np.sin(w * detune) for detune in (0.996, 1.0, 1.004)) / 3 + 0.2 * np.sin(w * 2)
+        env, release = np.minimum(1, t / 0.8), 1.0
+    elif kind == "bass":
+        wave, env = np.sin(w) + 0.3 * np.sin(w * 2), np.exp(-t * 1.5)
+    elif kind == "kick":
+        # Pitch falls from ~140 Hz to 45 Hz; the phase is the integral of that sweep.
+        wave, env = np.sin(2 * np.pi * (45 * t + 7 * (1 - np.exp(-t * 14)))), np.exp(-t * 8)
+    elif kind == "hat":
+        noise = np.random.default_rng(t.size).uniform(-1, 1, t.size)
+        wave, env = np.diff(noise, prepend=0.0), np.exp(-t * 70)
+    else:
+        raise ValueError(kind)
+    return wave * env * np.minimum(1, t / 0.005) * np.clip((length - t) / release, 0, 1)
+
+
+def arrangement(progression: list[str], bpm: int, *, arp=False, drums=False, pad=False, melody=(), bells=False, tail=3.0) -> tuple[list[Event], float]:
+    beat = 60 / bpm
+    bar = 4 * beat
+    events: list[Event] = []
+    for i, name in enumerate(progression):
+        t0 = i * bar
+        bass, *tones = CHORDS[name]
+        events.append((t0, "bass", bass, bar * 0.95, 0.5))
+        if pad:
+            events += [(t0, "pad", n, bar + 0.8, 0.16) for n in tones]
+        if arp:
+            events += [(t0 + k * beat / 2, "pluck", tones[j], beat * 1.5, 0.26) for k, j in enumerate([0, 1, 2, 1, 0, 1, 2, 1])]
+        if bells:
+            events.append((t0 + 2 * beat, "bell", octave_up(tones[(i * 2) % 3]), bar, 0.22))
+        if drums:
+            events += [(t0 + b * beat, "kick", "", 0.4, 0.8) for b in (0, 2)]
+            events += [(t0 + (b + 0.5) * beat, "hat", "", 0.1, 0.12) for b in range(4)]
+    events += [(b * beat, "bell", note, beats * beat + 1.0, 0.32) for b, note, beats in melody]
+    end = len(progression) * bar
+    home_bass, *home_tones = CHORDS["C"]  # every piece resolves to C for the tail
+    events += [(end, "pad", n, tail, 0.2) for n in home_tones] + [(end, "bass", home_bass, tail, 0.45)]
+    return events, end + tail
+
+
+def render_audio(events: list[Event], seconds: float) -> np.ndarray:
+    out = np.zeros(int((seconds + 5) * SR))
+    for start, kind, note, length, gain in events:
+        v = voice(kind, note, length) * gain
+        i = int(start * SR)
+        out[i:i + v.size] += v[: max(0, out.size - i)]
+    out = out[: int(seconds * SR)]
+    out *= np.clip((seconds - np.arange(out.size) / SR) / 1.5, 0, 1)
+    return out / np.abs(out).max() * 0.8
+
+
+def write_wav(p: Path, samples: np.ndarray) -> None:
+    import wave
+
+    with wave.open(str(p), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes((samples * 32767).astype("<i2").tobytes())
+
+
+def encode_audio(p: Path, samples: np.ndarray, tags: dict[str, str], codec: list[str], cover: Image.Image | None = None) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = Path(tmp) / "in.wav"
+        write_wav(wav, samples)
+        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav)]
+        if cover:
+            cover.convert("RGB").save(Path(tmp) / "cover.jpg", quality=90)
+            cmd += ["-i", str(Path(tmp) / "cover.jpg"), "-map", "0:a", "-map", "1:v", "-c:v", "copy", "-disposition:v", "attached_pic"]
+        cmd += ["-af", "aecho=0.8:1:40|85:0.22|0.12,volume=1.5", "-ac", "2", *codec]
+        for key, value in tags.items():
+            cmd += ["-metadata", f"{key}={value}"]
+        subprocess.run([*cmd, "-fflags", "+bitexact", str(p)], check=True)
+
+
+def audio_cover(title: str, subtitle: str, top: str, bottom: str) -> Image.Image:
+    im = gradient((1000, 1000), top, bottom)
+    im.paste(draw_logo(220), (90, 90), draw_logo(220))
+    d = ImageDraw.Draw(im)
+    d.text((90, 700), title, font=font(96, True), fill="white")
+    d.text((94, 820), subtitle, font=font(40), fill="#dbeafe")
+    return im
+
+
+PODCAST_MELODY = [
+    (16, "E5", 1), (17, "D5", 0.5), (17.5, "E5", 0.5), (18, "G5", 2),
+    (20, "D5", 1), (21, "B4", 1), (22, "D5", 2),
+    (24, "C5", 1), (25, "E5", 1), (26, "A5", 2),
+    (28, "A5", 1), (29, "G5", 1), (30, "F5", 1), (31, "E5", 1), (32, "C5", 2),
+]
+JINGLE_MELODY = [
+    (0, "C5", 0.5), (0.5, "E5", 0.5), (1, "A5", 0.5), (1.5, "C6", 1.5),
+    (4, "D5", 0.5), (4.5, "G5", 0.5), (5, "B5", 0.5), (5.5, "D6", 1.5),
+    (8, "E5", 0.5), (8.5, "G5", 0.5), (9, "C6", 0.5), (9.5, "E6", 2.5),
+]
+# Short UI chimes, one group every 2.2 s: upload done, shared, deleted, mention, ping, sync complete.
+UI_SOUNDS = [["C5", "E5", "G5"], ["G5", "C6"], ["E5", "C5"], ["A4", "C5", "E5", "A5"], ["C6"], ["F5", "A5", "C6", "F6"]]
+
+
+def build_audio() -> list[Path]:
+    d = reset_dir(OUT / "Audio")
+    artist = {"artist": "Cloud Studio", "date": "2026", "comment": "Original music for the Cloud demo workspace"}
+
+    events, secs = arrangement(["C", "G", "Am", "F"] * 2, 104, arp=True, drums=True, melody=PODCAST_MELODY)
+    encode_audio(d / "Podcast Intro.mp3", render_audio(events, secs),
+                 {"title": "Podcast Intro", "album": "Cloud Talks", "genre": "Podcast", "track": "1", **artist},
+                 ["-c:a", "libmp3lame", "-b:a", "192k", "-id3v2_version", "3"], audio_cover("Cloud Talks", "Episode intro", "#2563eb", "#1e3a8a"))
+
+    events, secs = arrangement(["F", "G", "C", "C"], 120, arp=True, pad=True, melody=JINGLE_MELODY)
+    encode_audio(d / "Brand Jingle.m4a", render_audio(events, secs),
+                 {"title": "Brand Jingle", "album": "Cloud Sound Logo", "genre": "Jingle", **artist},
+                 ["-c:a", "aac", "-b:a", "160k"], audio_cover("Jingle", "Cloud sound logo", "#7c3aed", "#312e81"))
+
+    events, secs = arrangement(["Am", "F", "C", "G"] * 3, 72, pad=True, bells=True, tail=4.0)
+    encode_audio(d / "Ambient Loop.flac", render_audio(events, secs),
+                 {"title": "Ambient Loop", "album": "Cloud Backgrounds", "genre": "Ambient", **artist},
+                 ["-c:a", "flac"], audio_cover("Ambient", "Background loop", "#0f766e", "#134e4a"))
+
+    events = [(g * 2.2 + 0.4 + k * 0.12, "bell", note, 1.6, 0.4) for g, group in enumerate(UI_SOUNDS) for k, note in enumerate(group)]
+    encode_audio(d / "UI Sounds.wav", render_audio(events, len(UI_SOUNDS) * 2.2 + 1.5),
+                 {"title": "UI Sounds", **artist}, ["-c:a", "pcm_s16le"])
+    return sorted(d.iterdir())
+
+
+# --- Video -----------------------------------------------------------------
+# Frames are rendered with Pillow (Ken Burns pans over the demo photos, title
+# cards, lower thirds) and piped as raw RGB into ffmpeg with a synth soundtrack.
+
+VW, VH, FPS = 1280, 720, 25
+
+
+def ken_burns(src: Image.Image, f: float, z0: float, z1: float, c0=(0.5, 0.5), c1=(0.5, 0.5)) -> Image.Image:
+    # Crop width goes from z0 to z1 (fraction of the source width), centre from c0 to c1.
+    cw = src.width * (z0 + (z1 - z0) * f)
+    ch = min(cw * VH / VW, src.height)
+    cw = ch * VW / VH
+    cx = src.width * (c0[0] + (c1[0] - c0[0]) * f)
+    cy = src.height * (c0[1] + (c1[1] - c0[1]) * f)
+    x = min(max(cx - cw / 2, 0), src.width - cw)
+    y = min(max(cy - ch / 2, 0), src.height - ch)
+    return src.resize((VW, VH), Image.BILINEAR, box=(x, y, x + cw, y + ch))
+
+
+@functools.cache
+def shade_band(height: int = 280) -> Image.Image:
+    alpha = Image.linear_gradient("L").resize((VW, height)).point(lambda v: int(v * 0.75))
+    black = Image.new("L", (VW, height), 0)
+    return Image.merge("RGBA", (black, black, black, alpha))
+
+
+def lower_third(frame: Image.Image, title: str, subtitle: str, f: float) -> Image.Image:
+    a = max(0.0, min(1.0, (f - 0.08) / 0.15, (0.95 - f) / 0.15))
+    layer = Image.new("RGBA", (VW, VH), (0, 0, 0, 0))
+    layer.paste(shade_band(), (0, VH - 280))
+    d = ImageDraw.Draw(layer)
+    d.text((72, VH - 176), title, font=font(54, True), fill="white")
+    d.text((75, VH - 104), subtitle, font=font(26), fill="#e5e7eb")
+    return Image.alpha_composite(frame.convert("RGBA"), fade_alpha(layer, a)).convert("RGB")
+
+
+def title_card(f: float, title: str, subtitle: str, top="#1d4ed8", bottom="#0f172a") -> Image.Image:
+    a = min(1.0, f / 0.3)
+    rise = int((1 - a) * 28)
+    layer = Image.new("RGBA", (VW, VH), (0, 0, 0, 0))
+    logo = draw_logo(150)
+    layer.paste(logo, ((VW - 150) // 2, 150 + rise), logo)
+    d = ImageDraw.Draw(layer)
+    for text, size, bold, y, fill in [(title, 58, True, 350, "white"), (subtitle, 28, False, 438, "#cbd5e1")]:
+        fnt = font(size, bold)
+        d.text(((VW - d.textlength(text, font=fnt)) / 2, y + rise), text, font=fnt, fill=fill)
+    return Image.alpha_composite(gradient((VW, VH), top, bottom).convert("RGBA"), fade_alpha(layer, a)).convert("RGB")
+
+
+def write_video(p: Path, scenes: list, music: np.ndarray, codec: list[str]) -> None:
+    black = Image.new("RGB", (VW, VH), "black")
+    seconds = sum(secs for secs, _ in scenes)
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = Path(tmp) / "music.wav"
+        write_wav(wav, music[: int(seconds * SR)])
+        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{VW}x{VH}", "-r", str(FPS), "-i", "-",
+               "-i", str(wav), "-ac", "2", *codec, "-shortest", "-fflags", "+bitexact", str(p)]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        for secs, render in scenes:
+            n = round(secs * FPS)
+            for i in range(n):
+                t = i / FPS
+                frame = Image.blend(black, render(i / (n - 1)), min(1.0, t / 0.4, (secs - t) / 0.4))
+                proc.stdin.write(frame.tobytes())
+        proc.stdin.close()
+        proc.wait()
+    if proc.returncode:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+
+def build_videos() -> list[Path]:
+    d = reset_dir(OUT / "Videos")
+
+    def photo(pid: int) -> Image.Image:
+        return Image.open(PICSUM / f"{pid}.jpg").convert("RGB")
+
+    def music(progression: list[str], bpm: int, seconds: float, **kw) -> np.ndarray:
+        events, _ = arrangement(progression, bpm, **kw)
+        return render_audio(events, seconds)
+
+    sky, workshop, coffee = photo(1067), photo(1059), photo(1060)
+    write_video(d / "Brand Video.mov", [
+        (4, lambda f: title_card(f, "Cloud", "Files for teams that live in the browser")),
+        (4, lambda f: lower_third(ken_burns(sky, f, 0.95, 0.75, (0.4, 0.5), (0.6, 0.45)), "Browse", "Every storage backend in one familiar view", f)),
+        (4, lambda f: lower_third(ken_burns(workshop, f, 0.7, 0.9), "Preview", "Documents, photos, video and code, right in the tab", f)),
+        (4, lambda f: lower_third(ken_burns(coffee, f, 0.9, 0.7, (0.5, 0.6), (0.5, 0.5)), "Share", "Links with a PIN and an expiry date", f)),
+        (4, lambda f: title_card(f, "files.example.com", "Start a workspace in minutes")),
+    ], music(["C", "G", "Am", "F"] * 3, 96, 20, arp=True, drums=True, pad=True),
+        ["-c:v", "libx264", "-preset", "medium", "-crf", "22", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart"])
+
+    dashboard, browser = Image.open(OUT / "Design" / "dashboard.png").convert("RGB"), Image.open(OUT / "Design" / "file-browser.jpg").convert("RGB")
+    write_video(d / "Launch Video.webm", [
+        (3, lambda f: title_card(f, "Introducing Cloud 3.0", "Launching July 2026", "#111827", "#020617")),
+        (5, lambda f: lower_third(ken_burns(dashboard, f, 1.0, 0.62, (0.5, 0.5), (0.42, 0.3)), "New admin overview", "Storage, users and activity at a glance", f)),
+        (4, lambda f: lower_third(ken_burns(browser, f, 0.65, 0.9, (0.3, 0.35), (0.5, 0.5)), "Faster grid previews", "Thumbnails are generated on first view", f)),
+        (3, lambda f: title_card(f, "Available today", "Update from the admin panel", "#111827", "#020617")),
+    ], music(["Am", "F", "C", "G"] * 2, 120, 15, arp=True, drums=True),
+        ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", "-row-mt", "1", "-deadline", "good", "-cpu-used", "4", "-pix_fmt", "yuv420p", "-c:a", "libopus", "-b:a", "96k"])
+
+    facade, tower, white = photo(1076), photo(1031), photo(1081)
+    write_video(d / "Office Tour.mkv", [
+        (4, lambda f: lower_third(ken_burns(facade, f, 0.9, 0.7, (0.5, 0.6), (0.5, 0.4)), "Limassol office", "Our second home, opening Q4 2026", f)),
+        (4, lambda f: lower_third(ken_burns(tower, f, 0.75, 0.95), "Open floor", "Forty desks for engineering and support", f)),
+        (4, lambda f: lower_third(ken_burns(white, f, 0.95, 0.75, (0.6, 0.5), (0.4, 0.5)), "Rooftop", "Team lunch every Friday", f)),
+    ], music(["F", "C", "G", "Am"] * 2, 80, 12, arp=True, pad=True),
+        ["-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "libopus", "-b:a", "96k"])
+    return sorted(d.iterdir())
+
+
+# --- Presentations ---------------------------------------------------------
+
+def write_pptx(p: Path, deck: str, accent: str, slides: list[tuple]) -> None:
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.dml.color import RGBColor
+    from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.util import Inches, Pt
+
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)
+    prs.core_properties.title = deck
+    prs.core_properties.author = "Cloud Demo Workspace"
+    palette = [accent, "#10b981", "#f59e0b", "#9ca3af"]
+
+    def rgb(hex_color: str) -> RGBColor:
+        return RGBColor.from_string(hex_color.lstrip("#"))
+
+    def box(slide, x: float, y: float, w: float, h: float, fill: str) -> None:
+        shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(x), Inches(y), Inches(w), Inches(h))
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = rgb(fill)
+        shape.line.fill.background()
+
+    def text(slide, x: float, y: float, w: float, h: float, lines, size: int, color="#111827", bold=False, space=0) -> None:
+        tf = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h)).text_frame
+        tf.word_wrap = True
+        for i, line in enumerate([lines] if isinstance(lines, str) else lines):
+            para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+            para.space_after = Pt(space)
+            run = para.add_run()
+            run.text = line
+            run.font.size = Pt(size)
+            run.font.bold = bold
+            run.font.color.rgb = rgb(color)
+
+    logo = io.BytesIO()
+    draw_logo(256).save(logo, "PNG")
+    for n, (kind, heading, *args) in enumerate(slides, 1):
+        s = prs.slides.add_slide(prs.slide_layouts[6])
+        if kind == "title":
+            box(s, 0, 0, 13.333, 7.5, accent)
+            logo.seek(0)
+            s.shapes.add_picture(logo, Inches(0.9), Inches(1.2), Inches(1.3))
+            text(s, 0.9, 3.0, 11.5, 1.4, heading, 48, "#ffffff", True)
+            text(s, 0.9, 4.3, 11.5, 0.8, args[0], 22, "#e5e7eb")
+            continue
+        box(s, 0, 0, 13.333, 0.12, accent)
+        text(s, 0.7, 0.45, 12, 0.9, heading, 30, bold=True)
+        text(s, 0.7, 6.9, 8, 0.4, f"{deck} · Cloud", 11, "#9ca3af")
+        text(s, 12.0, 6.9, 0.8, 0.4, str(n), 11, "#9ca3af")
+        if kind == "bullets":
+            text(s, 0.9, 1.6, 11.5, 5, [f"•  {b}" for b in args[0]], 22, "#374151", space=14)
+        elif kind == "kpis":
+            for i, (label, value, delta) in enumerate(args[0]):
+                x = 0.7 + i * 3.05
+                box(s, x, 1.8, 2.8, 2.4, "#f3f4f6")
+                text(s, x + 0.25, 2.0, 2.4, 0.4, label, 14, "#6b7280")
+                text(s, x + 0.25, 2.5, 2.4, 0.9, value, 36, bold=True)
+                text(s, x + 0.25, 3.45, 2.4, 0.4, delta, 14, "#059669")
+            text(s, 0.7, 4.7, 11.8, 1.8, args[1], 18, "#374151")
+        elif kind in ("column", "line", "doughnut"):
+            categories, series_data = args
+            data = CategoryChartData()
+            data.categories = categories
+            for name, values in series_data.items():
+                data.add_series(name, values)
+            chart_type = {"column": XL_CHART_TYPE.COLUMN_CLUSTERED, "line": XL_CHART_TYPE.LINE_MARKERS, "doughnut": XL_CHART_TYPE.DOUGHNUT}[kind]
+            chart = s.shapes.add_chart(chart_type, Inches(0.9), Inches(1.5), Inches(11.5), Inches(5.2), data).chart
+            chart.has_legend = True
+            chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+            chart.legend.include_in_layout = False
+            chart.font.size = Pt(14)
+            plot = chart.plots[0]
+            if kind == "doughnut":
+                plot.has_data_labels = True
+                plot.data_labels.number_format = '0"%"'
+                plot.data_labels.number_format_is_linked = False
+                fills = [point.format.fill for point in plot.series[0].points]
+            else:
+                fills = [ser.format.fill for ser in plot.series]
+            for i, fill in enumerate(fills):
+                fill.solid()
+                fill.fore_color.rgb = rgb(palette[i % len(palette)])
+            if kind == "line":
+                for i, ser in enumerate(plot.series):
+                    ser.format.line.color.rgb = rgb(palette[i])
+                    ser.format.line.width = Pt(3)
+        elif kind == "image":
+            path, caption = args
+            s.shapes.add_picture(str(path), Inches(0.7), Inches(1.5), height=Inches(5.0))
+            im = Image.open(path)
+            width = 5.0 * im.width / im.height
+            text(s, 0.7 + width + 0.4, 1.6, 12.3 - width - 0.4, 5, caption, 18, "#374151", space=10)
+        elif kind == "table":
+            rows = args[0]
+            table = s.shapes.add_table(len(rows), len(rows[0]), Inches(0.7), Inches(1.6), Inches(11.9), Inches(0.5 * len(rows))).table
+            for r, row in enumerate(rows):
+                for c, value in enumerate(row):
+                    cell = table.cell(r, c)
+                    cell.text = value
+                    cell.text_frame.paragraphs[0].runs[0].font.size = Pt(14)
+                    if r == 0:
+                        cell.fill.solid()
+                        cell.fill.fore_color.rgb = rgb(accent)
+        elif kind == "quote":
+            quote, who = args
+            text(s, 1.2, 2.0, 10.8, 2.6, f"“{quote}”", 30)
+            text(s, 1.2, 4.8, 10.8, 0.6, f"— {who}", 18, "#6b7280")
+        else:
+            raise ValueError(kind)
+    prs.save(str(p))
+
+
+def write_odp(p: Path, title: str, subtitle: str, slides: list[tuple[str, list[str], list[tuple[Path, str]]]]) -> None:
+    # Hand-built ODF presentation on a 28 x 15.75 cm page: a title page, then a
+    # heading with bullets on the left and/or pictures (with captions) per slide.
+    def esc(s: str) -> str:
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def frame(x: float, y: float, w: float, h: float, style: str, paras: list[str]) -> str:
+        body = "".join(f'<text:p text:style-name="{style}">{esc(t)}</text:p>' for t in paras)
+        return f'<draw:frame draw:style-name="gr" svg:x="{x:.2f}cm" svg:y="{y:.2f}cm" svg:width="{w:.2f}cm" svg:height="{h:.2f}cm"><draw:text-box>{body}</draw:text-box></draw:frame>'
+
+    pictures: dict[str, bytes] = {}
+    pages = [f'<draw:page draw:name="Title" draw:style-name="dpAccent" draw:master-page-name="Default">'
+             f'{frame(2, 5.0, 24, 2.4, "PTitle", [title])}{frame(2, 7.6, 24, 1.4, "PSub", [subtitle])}</draw:page>']
+    for i, (heading, bullets, images) in enumerate(slides, 2):
+        parts = [frame(1.5, 0.9, 25, 1.8, "PHead", [heading])]
+        if bullets:
+            parts.append(frame(1.5, 3.2, 12 if images else 25, 11, "PBody", [f"•  {b}" for b in bullets]))
+        x0, area = (14.5, 12.0) if bullets else (1.5, 25.0)
+        gap = 0.6
+        cell = (area - gap * (len(images) - 1)) / max(1, len(images))
+        for j, (src, caption) in enumerate(images):
+            im = Image.open(src).convert("RGB")
+            im.thumbnail((1200, 1200))
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=85)
+            name = f"Pictures/s{i}-{j}.jpg"
+            pictures[name] = buf.getvalue()
+            w = cell
+            h = w * im.height / im.width
+            if h > 9.0:
+                w, h = w * 9.0 / h, 9.0
+            x = x0 + j * (cell + gap) + (cell - w) / 2
+            parts.append(f'<draw:frame draw:style-name="gr" svg:x="{x:.2f}cm" svg:y="3.2cm" svg:width="{w:.2f}cm" svg:height="{h:.2f}cm">'
+                         f'<draw:image xlink:href="{name}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>')
+            parts.append(frame(x0 + j * (cell + gap), 3.4 + h, cell, 1.2, "PCaption", [caption]))
+        pages.append(f'<draw:page draw:name="Slide {i}" draw:style-name="dpPlain" draw:master-page-name="Default">{"".join(parts)}</draw:page>')
+
+    ns = ('xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
+          'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" '
+          'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" '
+          'xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" office:version="1.2"')
+
+    def para_style(name: str, size: int, color: str, bold=False) -> str:
+        weight = ' fo:font-weight="bold"' if bold else ""
+        return (f'<style:style style:name="{name}" style:family="paragraph"><style:paragraph-properties fo:margin-bottom="0.25cm"/>'
+                f'<style:text-properties fo:font-family="DejaVu Sans" fo:font-size="{size}pt" fo:color="{color}"{weight}/></style:style>')
+
+    content = (
+        f'<?xml version="1.0" encoding="UTF-8"?><office:document-content {ns}><office:automatic-styles>'
+        '<style:style style:name="dpAccent" style:family="drawing-page"><style:drawing-page-properties draw:fill="solid" draw:fill-color="#0f766e"/></style:style>'
+        '<style:style style:name="dpPlain" style:family="drawing-page"><style:drawing-page-properties draw:fill="solid" draw:fill-color="#ffffff"/></style:style>'
+        '<style:style style:name="gr" style:family="graphic"><style:graphic-properties draw:stroke="none" draw:fill="none"/></style:style>'
+        + para_style("PTitle", 40, "#ffffff", True) + para_style("PSub", 20, "#ccfbf1") + para_style("PHead", 30, "#111827", True)
+        + para_style("PBody", 18, "#374151") + para_style("PCaption", 12, "#6b7280")
+        + "</office:automatic-styles><office:body><office:presentation>" + "".join(pages)
+        + "</office:presentation></office:body></office:document-content>"
+    )
+    styles = (
+        f'<?xml version="1.0" encoding="UTF-8"?><office:document-styles {ns}><office:automatic-styles>'
+        '<style:page-layout style:name="PM1"><style:page-layout-properties fo:margin-top="0cm" fo:margin-bottom="0cm" fo:margin-left="0cm" '
+        'fo:margin-right="0cm" fo:page-width="28cm" fo:page-height="15.75cm" style:print-orientation="landscape"/></style:page-layout>'
+        '</office:automatic-styles><office:master-styles><style:master-page style:name="Default" style:page-layout-name="PM1"/>'
+        "</office:master-styles></office:document-styles>"
+    )
+    entries = [("/", "application/vnd.oasis.opendocument.presentation"), ("content.xml", "text/xml"), ("styles.xml", "text/xml")]
+    entries += [(name, "image/jpeg") for name in pictures]
+    manifest = (
+        '<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">'
+        + "".join(f'<manifest:file-entry manifest:full-path="{path}" manifest:media-type="{mime}"/>' for path, mime in entries)
+        + "</manifest:manifest>"
+    )
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr(zipfile.ZipInfo("mimetype"), "application/vnd.oasis.opendocument.presentation", compress_type=zipfile.ZIP_STORED)
+        z.writestr("META-INF/manifest.xml", manifest, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr("content.xml", content, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr("styles.xml", styles, compress_type=zipfile.ZIP_DEFLATED)
+        for name, data in pictures.items():
+            z.writestr(name, data, compress_type=zipfile.ZIP_STORED)
+
+
+def build_presentations() -> list[Path]:
+    d = OUT / "Documents"
+    write_pptx(d / "Q3 Product Review.pptx", "Q3 Product Review", "#2563eb", [
+        ("title", "Q3 Product Review", "Cloud · Product team · July 2026"),
+        ("bullets", "Agenda", ["Highlights from the quarter", "Usage and growth", "What shipped", "Q4 roadmap", "Asks for leadership"]),
+        ("kpis", "Highlights", [("Files stored", "184k", "+12% QoQ"), ("Storage used", "2.7 TB", "+0.4 TB"), ("Share links", "1,092", "+31% QoQ"), ("Active users", "318", "+9% QoQ")],
+         "Share links grew fastest after PIN-protected links shipped in June. Storage growth is driven by video uploads from three design teams."),
+        ("column", "Uploads per month (thousands)", ["Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+         {"Images": (8.1, 9.4, 10.2, 11.0, 12.6, 13.9), "Documents": (5.2, 5.6, 6.1, 6.0, 6.8, 7.3), "Video": (1.1, 1.4, 1.9, 2.6, 3.2, 3.8)}),
+        ("image", "New admin overview", OUT / "Design" / "dashboard.png",
+         ["Storage, users and activity on one screen.", "Replaces three separate admin pages.", "Rolled out to all workspaces on 8 July."]),
+        ("table", "Q4 roadmap", [
+            ["Theme", "Milestone", "Owner", "Status"],
+            ["Sharing", "Group sharing", "Anna Kowalski", "Planned"],
+            ["Search", "Content search GA", "Marco Rossi", "In progress"],
+            ["Platform", "Desktop sync client beta", "Tom Schmidt", "Proposed"],
+            ["Storage", "Tiered object storage", "Marco Rossi", "Planned"],
+        ]),
+        ("bullets", "Asks", ["Approve two more search engineers for Q4", "Decide on desktop sync client scope by September", "Budget for the Limassol office fit-out"]),
+        ("title", "Questions?", "product@files.example.com"),
+    ])
+    write_pptx(d / "Sales Kickoff 2026.pptx", "Sales Kickoff 2026", "#0f766e", [
+        ("title", "Sales Kickoff 2026", "Second half · Limassol · 14 July 2026"),
+        ("kpis", "H1 in numbers", [("New customers", "47", "+18 vs H2 2025"), ("ARR", "€3.1M", "+42% YoY"), ("Net retention", "118%", "+6 pts"), ("Win rate", "29%", "+4 pts")],
+         "Mid-market deals closed fastest where a migration from an on-premise NAS was part of the pitch."),
+        ("doughnut", "Pipeline by segment", ["SMB", "Mid-market", "Enterprise"], {"Share of pipeline": (38, 41, 21)}),
+        ("line", "Monthly recurring revenue (k€)", ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+         {"2026": (214, 223, 231, 238, 249, 258), "2025": (152, 158, 161, 167, 172, 180)}),
+        ("quote", "From the field", "We moved four terabytes off our old NAS in a weekend and nobody noticed. That is exactly what we wanted.", "Head of IT, Helios Analytics"),
+        ("bullets", "Plays for H2", ["NAS replacement: lead with the migration service", "Agencies: share links with PIN and expiry", "Regulated teams: audit log and data retention policy", "Partners: Northwind Labs for search projects"]),
+        ("image", "Limassol office opens in Q4", PICSUM / "1067.jpg", ["Room for the whole EMEA sales team.", "Customer briefing centre on the top floor."]),
+        ("title", "Let's go", "sales@files.example.com"),
+    ])
+    people = OUT / "People"
+    write_odp(d / "Company All-Hands.odp", "Company All-Hands", "July 2026 · Berlin and Limassol", [
+        ("Welcome to the team", [], [(people / "sofia-andersen.webp", "Sofia Andersen · Design"), (people / "lucas-costa.webp", "Lucas Costa · Sales"),
+                                     (people / "mia-nakamura.png", "Mia Nakamura · Engineering"), (people / "felix-berg.jpg", "Felix Berg · Support")]),
+        ("Q2 by the numbers", ["Revenue up 42% year over year", "318 active users across 6 workspaces", "Share links with PIN shipped on time", "Two incidents, both resolved within an hour"], []),
+        ("Limassol office", ["Lease signed, fit-out starts in September", "Forty desks, opening Q4 2026", "Relocation support available, ask HR"], [(PICSUM / "1076.jpg", "Building on the old harbour")]),
+        ("What is next", ["Content search GA", "Desktop sync client beta", "Company offsite in October"], []),
+    ])
+    return [d / "Q3 Product Review.pptx", d / "Sales Kickoff 2026.pptx", d / "Company All-Hands.odp"]
+
+
+# --- Invoices --------------------------------------------------------------
+
+CLOUD_CO = {
+    "name": "Cloud Files Ltd", "lines": ["12 Harbour Road", "3035 Limassol, Cyprus"], "vat": "CY00000000X", "reg": "HE 000000",
+    "email": "billing@files.example.com", "bank": "Demo Bank Ltd", "iban": "CY00 0000 0000 0000 0000 0000 0000", "bic": "DEMOCY2N", "accent": "#2563eb",
+}
+CLOUD_BILL_TO = ("Cloud Files Ltd", ["Finance", *CLOUD_CO["lines"], f"VAT {CLOUD_CO['vat']}"])
+REVERSE_CHARGE = "Reverse charge: VAT to be accounted for by the recipient (Art. 196, Directive 2006/112/EC)."
+INVOICES = [
+    {
+        "number": "INV-2026-0151", "issued": date(2026, 7, 1), "terms": 30, "ref": "PO 7741", "seller": CLOUD_CO, "vat": 0.0, "note": REVERSE_CHARGE,
+        "buyer": ("Helios Analytics GmbH", ["Accounts payable", "Kastanienweg 18", "10115 Berlin, Germany", "VAT DE000000000"]),
+        "items": [("Cloud Business plan, 50 seats, July 2026", 50, 12.00), ("Additional storage, per TB", 2, 40.00), ("Priority support add-on", 1, 150.00)],
+    },
+    {
+        "number": "INV-2026-0158", "issued": date(2026, 7, 15), "terms": 14, "ref": "Migration phase 2", "seller": CLOUD_CO, "vat": 0.19, "note": "Thank you for your business.",
+        "buyer": ("Kestrel Logistics Ltd", ["Finance department", "7 Pier Street", "3036 Limassol, Cyprus"]),
+        "items": [("Migration assessment, hours", 12, 150.00), ("Data transfer and verification, per TB", 6.5, 45.00), ("On-site training session", 1, 600.00), ("Post-migration support retainer, July", 1, 1200.00)],
+    },
+    {
+        "number": "NWL-20417", "issued": date(2026, 6, 28), "terms": 30, "ref": "Vendor agreement VA-2026-03", "vat": 0.0, "note": REVERSE_CHARGE, "buyer": CLOUD_BILL_TO,
+        "seller": {"name": "Northwind Labs B.V.", "lines": ["Lindengracht 210", "1015 Amsterdam, Netherlands"], "vat": "NL000000000B01", "reg": "KvK 00000000",
+                   "email": "invoices@northwindlabs.example", "bank": "Demo Bank N.V.", "iban": "NL00 DEMO 0000 0000 00", "bic": "DEMONL2A", "accent": "#0f766e"},
+        "items": [("Search indexing consulting, June 2026, hours", 24, 120.00), ("Relevance tuning workshop", 1, 900.00)],
+    },
+    {
+        "number": "OS-2026-088", "issued": date(2026, 7, 20), "terms": 30, "ref": "Brand video 2026", "vat": 0.19, "note": "Usage rights: worldwide, all channels, perpetual.", "buyer": CLOUD_BILL_TO,
+        "seller": {"name": "Orbit Studio Ltd", "lines": ["21 Olive Grove Lane", "4040 Limassol, Cyprus"], "vat": "CY00000001Z", "reg": "HE 000001",
+                   "email": "studio@orbitstudio.example", "bank": "Demo Bank Ltd", "iban": "CY00 0000 0000 0000 0000 0000 0001", "bic": "DEMOCY2N", "accent": "#b45309"},
+        "items": [("Brand video, concept and storyboard", 1, 1800.00), ("Filming, one day with crew", 1, 2400.00), ("Edit, grade and sound mix", 1, 1650.00), ("Launch video cut-downs, 15 s", 3, 250.00)],
+    },
+]
+
+
+def long_date(d: date) -> str:
+    return f"{d.day} {d:%B %Y}"
+
+
+def write_invoice(p: Path, inv: dict) -> None:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+    from reportlab.platypus import Table, TableStyle
+
+    def money(v: float) -> str:
+        return f"€{v:,.2f}"
+
+    seller, (buyer, buyer_lines) = inv["seller"], inv["buyer"]
+    accent, ink, gray = colors.HexColor(seller["accent"]), colors.HexColor("#111827"), colors.HexColor("#6b7280")
+    w, h = A4
+    c = canvas.Canvas(str(p), pagesize=A4, invariant=1)
+    c.setTitle(f"Invoice {inv['number']}")
+    c.setAuthor(seller["name"])
+
+    if seller is CLOUD_CO:
+        c.drawImage(ImageReader(draw_logo(128)), 20 * mm, h - 38 * mm, 18 * mm, 18 * mm, mask="auto")
+    else:
+        c.setFillColor(accent)
+        c.roundRect(20 * mm, h - 38 * mm, 18 * mm, 18 * mm, 3 * mm, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawCentredString(29 * mm, h - 31.5 * mm, "".join(word[0] for word in seller["name"].split()[:2]))
+    c.setFillColor(ink)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42 * mm, h - 26 * mm, seller["name"])
+    c.setFillColor(gray)
+    c.setFont("Helvetica", 9)
+    c.drawString(42 * mm, h - 31.5 * mm, ", ".join(seller["lines"]))
+    c.drawString(42 * mm, h - 36 * mm, f"{seller['email']} · VAT {seller['vat']}")
+    c.setFillColor(accent)
+    c.setFont("Helvetica-Bold", 28)
+    c.drawRightString(w - 20 * mm, h - 30 * mm, "INVOICE")
+    c.setFillColor(gray)
+    c.setFont("Helvetica", 10)
+    c.drawRightString(w - 20 * mm, h - 37 * mm, inv["number"])
+
+    y = h - 58 * mm
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(20 * mm, y, "BILL TO")
+    c.drawString(120 * mm, y, "DETAILS")
+    c.setFillColor(ink)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(20 * mm, y - 6 * mm, buyer)
+    c.setFont("Helvetica", 9.5)
+    for i, line in enumerate(buyer_lines):
+        c.drawString(20 * mm, y - (11 + i * 4.6) * mm, line)
+    due = inv["issued"] + timedelta(days=inv["terms"])
+    for i, (label, value) in enumerate([("Issue date", long_date(inv["issued"])), ("Due date", long_date(due)), ("Reference", inv["ref"]), ("Terms", f"Net {inv['terms']} days")]):
+        c.setFillColor(gray)
+        c.drawString(120 * mm, y - (6 + i * 5) * mm, label)
+        c.setFillColor(ink)
+        c.drawRightString(w - 20 * mm, y - (6 + i * 5) * mm, value)
+
+    rows = [["Description", "Qty", "Unit price", "Amount"]]
+    subtotal = 0.0
+    for desc, qty, unit in inv["items"]:
+        amount = round(qty * unit, 2)
+        subtotal += amount
+        rows.append([desc, f"{qty:g}", money(unit), money(amount)])
+    vat = round(subtotal * inv["vat"], 2)
+    table = Table(rows, colWidths=[92 * mm, 18 * mm, 30 * mm, 30 * mm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), accent), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9.5), ("FONT", (0, 1), (-1, -1), "Helvetica", 9.5),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"), ("LINEBELOW", (0, 1), (-1, -1), 0.4, colors.HexColor("#e5e7eb")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    _, th = table.wrapOn(c, w, h)
+    top = y - 36 * mm
+    table.drawOn(c, 20 * mm, top - th)
+
+    y = top - th - 10 * mm
+    for i, (label, value) in enumerate([("Subtotal", money(subtotal)), (f"VAT {inv['vat'] * 100:g}%", money(vat)), ("Total due", money(subtotal + vat))]):
+        last = i == 2
+        c.setFillColor(accent if last else gray)
+        c.setFont("Helvetica-Bold" if last else "Helvetica", 12 if last else 10)
+        c.drawString(130 * mm, y - i * 7 * mm, label)
+        c.drawRightString(w - 20 * mm, y - i * 7 * mm, value)
+
+    y -= 36 * mm
+    c.setFillColor(gray)
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(20 * mm, y, "PAYMENT")
+    c.setFont("Helvetica", 9.5)
+    c.setFillColor(ink)
+    for i, line in enumerate([f"Bank: {seller['bank']}", f"IBAN: {seller['iban']}", f"BIC: {seller['bic']}", f"Please quote {inv['number']} with your payment."]):
+        c.drawString(20 * mm, y - (6 + i * 5) * mm, line)
+    c.setFillColor(gray)
+    c.setFont("Helvetica-Oblique", 9)
+    c.drawString(20 * mm, y - 30 * mm, inv["note"])
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(w / 2, 14 * mm, f"{seller['name']} · Registration {seller['reg']} · VAT {seller['vat']} · {seller['email']} · Fictional company for demo purposes")
+    c.showPage()
+    c.save()
+
+
+def build_invoices() -> list[Path]:
+    d = reset_dir(OUT / "Documents" / "Invoices")
+    for inv in INVOICES:
+        write_invoice(d / f"Invoice {inv['number']}.pdf", inv)
+    return sorted(d.iterdir())
+
+
+# --- Marketing PDFs --------------------------------------------------------
+
+def draw_hero(c, src: Path, x: float, y: float, w: float, h: float, shade: float) -> None:
+    from reportlab.lib.utils import ImageReader
+
+    im = Image.open(src).convert("RGB")
+    ratio = w / h
+    cw = min(im.width, im.height * ratio)
+    ch = cw / ratio
+    left, top = (im.width - cw) / 2, (im.height - ch) / 2
+    # Hand reportlab a JPEG so it embeds the DCT stream as is instead of raw pixels.
+    buf = io.BytesIO()
+    im.crop((int(left), int(top), int(left + cw), int(top + ch))).save(buf, "JPEG", quality=85)
+    c.drawImage(ImageReader(buf), x, y, w, h)
+    c.saveState()
+    c.setFillColorRGB(0.06, 0.09, 0.16, alpha=shade)
+    c.rect(x, y, w, h, stroke=0, fill=1)
+    c.restoreState()
+
+
+def write_marketing_brief(p: Path) -> None:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    accent = colors.HexColor("#db2777")
+    styles = getSampleStyleSheet()
+    body = ParagraphStyle("body", parent=styles["BodyText"], fontName="Helvetica", fontSize=10.5, leading=15, spaceAfter=6)
+    h1 = ParagraphStyle("h1", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=14, textColor=accent, spaceBefore=10, spaceAfter=6)
+    title = "Marketing Brief"
+
+    def first(canvas, doc):
+        w, h = A4
+        draw_hero(canvas, PICSUM / "1048.jpg", 0, h - 92 * mm, w, 92 * mm, 0.5)
+        canvas.setFillColor(colors.white)
+        canvas.setFont("Helvetica-Bold", 34)
+        canvas.drawString(22 * mm, h - 62 * mm, title)
+        canvas.setFont("Helvetica", 14)
+        canvas.drawString(22 * mm, h - 74 * mm, "Cloud 3.0 launch campaign · Q3 2026")
+
+    def later(canvas, doc):
+        w, h = A4
+        canvas.setFillColor(accent)
+        canvas.rect(0, h - 6 * mm, w, 6 * mm, stroke=0, fill=1)
+        canvas.setFillColor(colors.HexColor("#9ca3af"))
+        canvas.setFont("Helvetica", 8.5)
+        canvas.drawString(22 * mm, 12 * mm, f"{title} · Cloud Demo Workspace")
+        canvas.drawRightString(w - 22 * mm, 12 * mm, str(doc.page))
+
+    def table(rows: list[list[str]], widths: list[float]) -> Table:
+        t = Table(rows, colWidths=[x * mm for x in widths])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), accent), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9.5), ("FONT", (0, 1), (-1, -1), "Helvetica", 9.5),
+            ("LINEBELOW", (0, 1), (-1, -1), 0.4, colors.HexColor("#e5e7eb")), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        return t
+
+    story = [Spacer(1, 72 * mm)]
+    for heading, paras in [
+        ("Objective", ["Announce Cloud 3.0 to existing workspaces and win 40 new mid-market customers by the end of Q3 2026. The release headline is the new admin overview; the supporting story is faster previews and safer share links."]),
+        ("Audience", ["IT leads at companies of 50 to 500 people who still run an on-premise NAS, and design or agency teams who share large files with clients every week."]),
+        ("Key messages", ["• One tab for every file your team owns, whatever the storage backend.", "• Previews for documents, photos, video and code without downloading anything.",
+                          "• Share links with a PIN and an expiry date, and an audit log behind them."]),
+    ]:
+        story.append(Paragraph(heading, h1))
+        story += [Paragraph(x, body) for x in paras]
+    story += [
+        Paragraph("Channels and timeline", h1),
+        table([["Week", "Channel", "Asset", "Owner"],
+               ["29 Jun", "Blog and newsletter", "Launch post, Launch Video.webm", "Chloe Dubois"],
+               ["6 Jul", "Webinar", "Q3 Product Review deck", "Marco Rossi"],
+               ["13 Jul", "Paid social", "Brand Video.mov cut-downs", "Orbit Studio"],
+               ["20 Jul", "Sales outreach", "Product One-Pager.pdf", "Lucas Costa"],
+               ["27 Jul", "Customer events", "Limassol office open day", "Sofia Andersen"]], [22, 42, 62, 40]),
+        KeepTogether([Paragraph("Budget", h1),
+                      table([["Item", "Amount"], ["Brand and launch video production", "€6,600"], ["Paid social", "€12,000"], ["Webinar platform and promotion", "€2,400"],
+                             ["Events and printed material", "€4,000"], ["Total", "€25,000"]], [126, 40])]),
+        Paragraph("Success metrics", h1),
+        Paragraph("• 40 new paying workspaces by 30 September 2026.<br/>• 1,500 webinar registrations, 35% attendance.<br/>• Share-link creation up 25% among existing customers.", body),
+        Paragraph("Approvals", h1),
+        Paragraph("Chloe Dubois (Marketing), Anna Kowalski (Product) and Tom Schmidt (Operations) signed off on 24 June 2026. All companies and people named in this brief are fictional.", body),
+    ]
+    doc = SimpleDocTemplate(str(p), pagesize=A4, leftMargin=22 * mm, rightMargin=22 * mm, topMargin=22 * mm, bottomMargin=22 * mm, title=title, author="Cloud Demo Workspace", invariant=1)
+    doc.build(story, onFirstPage=first, onLaterPages=later)
+
+
+def write_one_pager(p: Path) -> None:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+    from reportlab.platypus import Paragraph
+
+    w, h = A4
+    accent, ink, gray = colors.HexColor("#2563eb"), colors.HexColor("#111827"), colors.HexColor("#4b5563")
+    c = canvas.Canvas(str(p), pagesize=A4, invariant=1)
+    c.setTitle("Product One-Pager")
+    c.setAuthor("Cloud Demo Workspace")
+
+    draw_hero(c, PICSUM / "1078.jpg", 0, h - 120 * mm, w, 120 * mm, 0.55)
+    c.drawImage(ImageReader(draw_logo(128)), 20 * mm, h - 28 * mm, 12 * mm, 12 * mm, mask="auto")
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(35 * mm, h - 23.5 * mm, "Cloud")
+    c.setFont("Helvetica-Bold", 32)
+    c.drawString(20 * mm, h - 75 * mm, "One tab for every file")
+    c.drawString(20 * mm, h - 88 * mm, "your team owns.")
+    c.setFont("Helvetica", 13)
+    c.drawString(20 * mm, h - 101 * mm, "Browse, preview, search and share across S3, WebDAV and local disks.")
+
+    text = ParagraphStyle("t", fontName="Helvetica", fontSize=10, leading=14, textColor=gray)
+    col = (w - 40 * mm - 2 * 8 * mm) / 3
+    for i, (heading, para) in enumerate([
+        ("Browse", "Folders, grid and list views that feel like a desktop file manager, on top of any storage backend."),
+        ("Preview", "PDFs, Office documents, photos, video, audio and source code open in the tab, no download needed."),
+        ("Share", "Links with a PIN and an expiry date, group sharing, and an audit log for every access."),
+    ]):
+        x = 20 * mm + i * (col + 8 * mm)
+        c.setFillColor(accent)
+        c.roundRect(x, h - 140 * mm, 9 * mm, 9 * mm, 2 * mm, stroke=0, fill=1)
+        c.setFillColor(ink)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x, h - 150 * mm, heading)
+        block = Paragraph(para, text)
+        _, ph = block.wrapOn(c, col, 60 * mm)
+        block.drawOn(c, x, h - 155 * mm - ph)
+
+    c.setFillColor(colors.HexColor("#f3f4f6"))
+    c.rect(0, h - 222 * mm, w, 38 * mm, stroke=0, fill=1)
+    for i, (value, label) in enumerate([("184k", "files stored"), ("2.7 TB", "under management"), ("318", "active users"), ("99.95%", "uptime, last 12 months")]):
+        x = 20 * mm + i * (w - 40 * mm) / 4
+        c.setFillColor(accent)
+        c.setFont("Helvetica-Bold", 24)
+        c.drawString(x, h - 203 * mm, value)
+        c.setFillColor(gray)
+        c.setFont("Helvetica", 9.5)
+        c.drawString(x, h - 210 * mm, label)
+
+    c.setFillColor(ink)
+    c.setFont("Helvetica-Oblique", 13)
+    c.drawString(20 * mm, h - 240 * mm, "“We moved four terabytes off our old NAS in a weekend and nobody noticed.”")
+    c.setFillColor(gray)
+    c.setFont("Helvetica", 10)
+    c.drawString(20 * mm, h - 247 * mm, "Head of IT, Helios Analytics")
+
+    c.setFillColor(accent)
+    c.rect(0, 0, w, 32 * mm, stroke=0, fill=1)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(20 * mm, 17 * mm, "Start a workspace at files.example.com")
+    c.setFont("Helvetica", 10)
+    c.drawString(20 * mm, 10 * mm, "Free for teams of up to five · sales@files.example.com · Fictional product for demo purposes")
+    c.showPage()
+    c.save()
+
+
+def build_marketing() -> list[Path]:
+    d = OUT / "Documents"
+    write_marketing_brief(d / "Marketing Brief.pdf")
+    write_one_pager(d / "Product One-Pager.pdf")
+    return [d / "Marketing Brief.pdf", d / "Product One-Pager.pdf"]
+
+
+# --- Design files ----------------------------------------------------------
+
+def write_psd(p: Path) -> None:
+    # A layered website mockup, laid out on a 2880x1800 grid and written at
+    # 3840x2400. ImageMagick writes the first image as the flattened composite
+    # and the rest as named layers; full-size layers put it near 50 MB, like a
+    # real Photoshop mockup.
+    size, out_size = (2880, 1800), (3840, 2400)
+    hero = Image.open(PICSUM / "1043.jpg").convert("RGB").resize(size, Image.LANCZOS)
+    overlay = Image.new("RGBA", size, (15, 23, 42, 0))
+    overlay.putalpha(Image.linear_gradient("L").rotate(90, expand=True).resize(size).point(lambda v: int((255 - v) * 0.8)))
+
+    nav = Image.new("RGBA", size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(nav)
+    nav.paste(draw_logo(72), (120, 56), draw_logo(72))
+    d.text((210, 66), "Cloud", font=font(44, True), fill="white")
+    for i, item in enumerate(["Product", "Pricing", "Docs", "Blog"]):
+        d.text((1700 + i * 200, 74), item, font=font(32), fill="#e5e7eb")
+    d.rounded_rectangle([2500, 56, 2760, 128], 36, fill="white")
+    d.text((2560, 74), "Sign in", font=font(32, True), fill="#1d4ed8")
+
+    headline = Image.new("RGBA", size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(headline)
+    for i, line in enumerate(["Your files,", "every backend,", "one tab."]):
+        d.text((120, 480 + i * 150), line, font=font(130, True), fill="white")
+    d.text((126, 960), "Browse, preview and share without leaving the browser.", font=font(40), fill="#e5e7eb")
+    d.rounded_rectangle([120, 1060, 520, 1160], 50, fill="#2563eb")
+    d.text((190, 1088), "Start free", font=font(40, True), fill="white")
+
+    window = Image.new("RGBA", size, (0, 0, 0, 0))
+    shadow = Image.new("L", size, 0)
+    ImageDraw.Draw(shadow).rounded_rectangle([1340, 760, 2840, 1760], 28, fill=150)
+    window.putalpha(shadow.filter(ImageFilter.GaussianBlur(40)))
+    d = ImageDraw.Draw(window)
+    d.rounded_rectangle([1320, 700, 2820, 1740], 24, fill="#f3f4f6")
+    for i, col in enumerate(["#ef4444", "#f59e0b", "#10b981"]):
+        d.ellipse([1352 + i * 40, 724, 1376 + i * 40, 748], fill=col)
+    window.paste(Image.open(OUT / "Design" / "dashboard.png").convert("RGB").resize((1460, 912), Image.LANCZOS), (1340, 768))
+
+    layers = [(name, im.resize(out_size, Image.LANCZOS)) for name, im in
+              [("Hero photo", hero.convert("RGBA")), ("Gradient", overlay), ("App window", window), ("Headline", headline), ("Navigation", nav)]]
+    composite = layers[0][1]
+    for _, layer in layers[1:]:
+        composite = Image.alpha_composite(composite, layer)
+    with tempfile.TemporaryDirectory() as tmp:
+        composite.convert("RGB").save(Path(tmp) / "composite.png")
+        cmd = ["magick", str(Path(tmp) / "composite.png")]
+        for i, (name, layer) in enumerate(layers):
+            layer.save(Path(tmp) / f"{i}.png")
+            cmd += ["(", str(Path(tmp) / f"{i}.png"), "-set", "label", name, ")"]
+        subprocess.run([*cmd, "-compress", "RLE", str(p)], check=True)
+
+
+# Three phone screens, as primitives shared by the Sketch JSON and its PNG preview:
+# (kind, name, x, y, w, h, fill/colour, radius or font size, text)
+PHONE_W, PHONE_H = 390, 844
+PHONE_SCREENS = {
+    "Files": [("rect", "Background", 0, 0, 390, 844, "#ffffff", 0, ""),
+              ("text", "Title", 20, 64, 300, 40, "#111827", 30, "Files"),
+              ("rect", "Search", 20, 118, 350, 44, "#f3f4f6", 12, ""),
+              ("text", "Search hint", 36, 130, 200, 20, "#9ca3af", 16, "Search files"),
+              *[item for i, (name, meta, col) in enumerate([
+                  ("Photos", "56 items", "#f59e0b"), ("Q3 Roadmap.docx", "48 KB · Jul 8", "#2563eb"), ("Brand Guidelines.pdf", "21 KB · Jul 2", "#dc2626"),
+                  ("Brand Video.mov", "6 MB · Jul 14", "#7c3aed"), ("Podcast Intro.mp3", "0.5 MB · Jul 9", "#db2777"), ("inventory.xlsx", "12 KB · Jun 30", "#10b981"),
+                  ("UI Design.fig", "0.1 MB · Jul 5", "#0ea5e9")])
+                for item in [("rect", f"{name} icon", 20, 186 + i * 72, 44, 44, col, 10, ""),
+                             ("text", name, 78, 186 + i * 72, 280, 22, "#111827", 17, name),
+                             ("text", f"{name} meta", 78, 210 + i * 72, 280, 18, "#6b7280", 13, meta)]],
+              ("rect", "Tab bar", 0, 760, 390, 84, "#f9fafb", 0, ""),
+              *[("text", f"Tab {t}", 26 + i * 92, 790, 80, 20, "#2563eb" if i == 0 else "#6b7280", 14, t) for i, t in enumerate(["Files", "Recent", "Shared", "Account"])]],
+    "Preview": [("rect", "Background", 0, 0, 390, 844, "#0f172a", 0, ""),
+                ("text", "Name", 20, 64, 350, 30, "#ffffff", 20, "beach-sunset.jpg"),
+                ("text", "Meta", 20, 96, 350, 20, "#94a3b8", 14, "1600 × 1000 · 312 KB · Photos"),
+                ("rect", "Image", 0, 150, 390, 244, "#f59e0b", 0, ""),
+                ("rect", "Sun", 160, 210, 70, 70, "#fde68a", 35, ""),
+                ("rect", "Sea", 0, 300, 390, 94, "#1d4ed8", 0, ""),
+                *[("rect", f"Action {t}", 20 + i * 120, 440, 110, 48, "#1e293b", 12, "") for i, t in enumerate(["Share", "Download", "Info"])],
+                *[("text", f"Action {t} label", 36 + i * 120, 454, 90, 20, "#e2e8f0", 15, t) for i, t in enumerate(["Share", "Download", "Info"])]],
+    "Share": [("rect", "Background", 0, 0, 390, 844, "#ffffff", 0, ""),
+              ("text", "Title", 20, 64, 350, 40, "#111827", 28, "Share link"),
+              ("text", "File", 20, 108, 350, 20, "#6b7280", 15, "Project Plan.pdf"),
+              *[item for i, (label, on) in enumerate([("Require PIN", True), ("Expires in 7 days", True), ("Allow download", False)])
+                for item in [("text", label, 20, 170 + i * 64, 260, 24, "#111827", 17, label),
+                             ("rect", f"{label} toggle", 314, 166 + i * 64, 56, 32, "#2563eb" if on else "#d1d5db", 16, ""),
+                             ("rect", f"{label} knob", 342 if on else 318, 170 + i * 64, 24, 24, "#ffffff", 12, "")]],
+              ("text", "People", 20, 380, 350, 24, "#111827", 17, "Shared with"),
+              *[("rect", f"Avatar {i}", 20 + i * 52, 416, 44, 44, col, 22, "") for i, col in enumerate(["#f59e0b", "#10b981", "#7c3aed", "#db2777"])],
+              ("rect", "Copy button", 20, 700, 350, 56, "#2563eb", 14, ""),
+              ("text", "Copy button label", 150, 716, 120, 24, "#ffffff", 18, "Copy link")],
+}
+
+
+def draw_phone_preview() -> Image.Image:
+    im = Image.new("RGB", (1400, 1000), "#e5e7eb")
+    d = ImageDraw.Draw(im)
+    for n, primitives in enumerate(PHONE_SCREENS.values()):
+        ox, oy = 70 + n * 440, 70
+        screen = Image.new("RGB", (PHONE_W, PHONE_H), "white")
+        sd = ImageDraw.Draw(screen)
+        for kind, _, x, y, w, h, col, extra, text in primitives:
+            if kind == "rect":
+                sd.rounded_rectangle([x, y, x + w, y + h], extra, fill=col)
+            else:
+                sd.text((x, y), text, font=font(extra, extra >= 20), fill=col)
+        d.rounded_rectangle([ox - 14, oy - 14, ox + PHONE_W + 14, oy + PHONE_H + 14], 54, fill="#111827")
+        mask = Image.new("L", (PHONE_W, PHONE_H), 0)
+        ImageDraw.Draw(mask).rounded_rectangle([0, 0, PHONE_W, PHONE_H], 42, fill=255)
+        im.paste(screen, (ox, oy), mask)
+    return im
+
+
+def write_sketch(p: Path) -> None:
+    # Sketch's .sketch is a ZIP of JSON (document, meta, user, one file per page)
+    # plus previews/preview.png. Layers here are plain rectangles and text in the
+    # current file-format shape; good enough for type sniffers and previews.
+    ids = itertools.count()
+
+    def oid() -> str:
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"cloud-demo/sketch/{next(ids)}")).upper()
+
+    def color(hex_color: str) -> dict:
+        r, g, b = (int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        return {"_class": "color", "alpha": 1, "red": r, "green": g, "blue": b}
+
+    def base(cls: str, name: str, x: float, y: float, w: float, h: float) -> dict:
+        return {"_class": cls, "do_objectID": oid(), "name": name, "booleanOperation": -1, "isFixedToViewport": False, "isFlippedHorizontal": False,
+                "isFlippedVertical": False, "isLocked": False, "isVisible": True, "layerListExpandedType": 0, "nameIsFixed": True,
+                "resizingConstraint": 63, "resizingType": 0, "rotation": 0, "shouldBreakMaskChain": False,
+                "frame": {"_class": "rect", "constrainProportions": False, "x": x, "y": y, "width": w, "height": h}}
+
+    def layer(kind, name, x, y, w, h, col, extra, text) -> dict:
+        if kind == "rect":
+            corners = [{"_class": "curvePoint", "cornerRadius": extra, "curveFrom": pt, "curveMode": 1, "curveTo": pt, "hasCurveFrom": False, "hasCurveTo": False, "point": pt}
+                       for pt in ("{0, 0}", "{1, 0}", "{1, 1}", "{0, 1}")]
+            return {**base("rectangle", name, x, y, w, h), "edited": False, "isClosed": True, "pointRadiusBehaviour": 1, "points": corners, "fixedRadius": extra,
+                    "hasConvertedToNewRoundCorners": True, "style": {"_class": "style", "borders": [], "fills": [{"_class": "fill", "isEnabled": True, "fillType": 0, "color": color(col)}]}}
+        attrs = {"MSAttributedStringFontAttribute": {"_class": "fontDescriptor", "attributes": {"name": "Inter-SemiBold" if extra >= 20 else "Inter", "size": extra}},
+                 "MSAttributedStringColorAttribute": color(col), "paragraphStyle": {"_class": "paragraphStyle", "alignment": 0}}
+        return {**base("text", name, x, y, w, h), "automaticallyDrawOnUnderlyingPath": False, "dontSynchroniseWithSymbol": False, "lineSpacingBehaviour": 2, "textBehaviour": 0,
+                "glyphBounds": f"{{{{0, 0}}, {{{w}, {h}}}}}",
+                "attributedString": {"_class": "attributedString", "string": text, "attributes": [{"_class": "stringAttribute", "location": 0, "length": len(text), "attributes": attrs}]},
+                "style": {"_class": "style", "textStyle": {"_class": "textStyle", "encodedAttributes": attrs, "verticalAlignment": 0}}}
+
+    ruler = {"_class": "rulerData", "base": 0, "guides": []}
+    artboards = []
+    for n, (name, primitives) in enumerate(PHONE_SCREENS.items()):
+        artboards.append({**base("artboard", name, n * 490, 0, PHONE_W, PHONE_H), "layers": [layer(*prim) for prim in primitives],
+                          "backgroundColor": color("#ffffff"), "hasBackgroundColor": True, "includeBackgroundColorInExport": True, "hasClickThrough": True,
+                          "horizontalRulerData": ruler, "verticalRulerData": ruler, "resizesContent": False, "isFlowHome": n == 0})
+    page = {**base("page", "Mobile app", 0, 0, 0, 0), "layers": artboards, "horizontalRulerData": ruler, "verticalRulerData": ruler, "includeInCloudUpload": True}
+    document = {"_class": "document", "do_objectID": oid(), "colorSpace": 1, "currentPageIndex": 0,
+                "assets": {"_class": "assetCollection", "do_objectID": oid(), "colorAssets": [], "gradientAssets": [], "images": [], "colors": [], "gradients": [], "exportPresets": []},
+                "foreignLayerStyles": [], "foreignSymbols": [], "foreignTextStyles": [], "foreignSwatches": [],
+                "layerStyles": {"_class": "sharedStyleContainer", "do_objectID": oid(), "objects": []},
+                "layerTextStyles": {"_class": "sharedTextStyleContainer", "do_objectID": oid(), "objects": []},
+                "pages": [{"_class": "MSJSONFileReference", "_ref_class": "MSImmutablePage", "_ref": f"pages/{page['do_objectID']}"}]}
+    app = {"app": "com.bohemiancoding.sketch3", "appVersion": "99", "build": 180000, "variant": "NONAPPSTORE", "version": 146, "compatibilityVersion": 99, "coeditCompatibilityVersion": 145}
+    meta = {"commit": "0" * 40, **app, "autosaved": 0, "created": {"commit": "0" * 40, **app}, "saveHistory": ["NONAPPSTORE.180000"],
+            "pagesAndArtboards": {page["do_objectID"]: {"name": page["name"], "artboards": {a["do_objectID"]: {"name": a["name"]} for a in artboards}}}}
+    user = {"document": {"pageListHeight": 85, "pageListCollapsed": 0}, page["do_objectID"]: {"scrollOrigin": "{0, 0}", "zoomValue": 1}}
+    preview = io.BytesIO()
+    draw_phone_preview().save(preview, "PNG", optimize=True)
+    with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("document.json", json.dumps(document))
+        z.writestr("meta.json", json.dumps(meta))
+        z.writestr("user.json", json.dumps(user))
+        z.writestr(f"pages/{page['do_objectID']}.json", json.dumps(page))
+        z.writestr("previews/preview.png", preview.getvalue())
+
+
+def write_ai(p: Path) -> None:
+    # Modern Illustrator files are PDF-compatible: a PDF body with an .ai name.
+    # One artboard with four logo treatments, the palette and the wordmark.
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas
+
+    W, H = 1200, 800
+    c = canvas.Canvas(str(p), pagesize=(W, H), invariant=1)
+    c.setTitle("Logo Concepts")
+    c.setAuthor("Cloud Demo Workspace")
+    c.setFillColor(colors.HexColor("#f9fafb"))
+    c.rect(0, 0, W, H, stroke=0, fill=1)
+
+    def logo(x: float, y: float, size: float, square: str, sheet: str, fold: str, letter: str) -> None:
+        k = size / 256
+
+        def path(*xy: tuple[int, int]) -> None:
+            pth = c.beginPath()
+            pth.moveTo(x + xy[0][0] * k, y + (256 - xy[0][1]) * k)
+            for px, py in xy[1:]:
+                pth.lineTo(x + px * k, y + (256 - py) * k)
+            pth.close()
+            c.drawPath(pth, stroke=0, fill=1)
+
+        c.setFillColor(colors.HexColor(square))
+        c.roundRect(x + 16 * k, y + 16 * k, 224 * k, 224 * k, 40 * k, stroke=0, fill=1)
+        c.setFillColor(colors.HexColor(sheet))
+        path((72, 56), (172, 56), (208, 92), (208, 212), (72, 212))
+        c.setFillColor(colors.HexColor(fold))
+        path((172, 56), (172, 92), (208, 92))
+        c.setFillColor(colors.HexColor(letter))
+        path((104, 96), (164, 96), (164, 112), (122, 112), (122, 132), (158, 132), (158, 148), (122, 148), (122, 184), (104, 184))
+
+    variants = [("Primary", "#ffffff", ("#2563eb", "#ffffff", "#bfdbfe", "#1d4ed8")), ("Reversed", "#1d4ed8", ("#ffffff", "#2563eb", "#93c5fd", "#ffffff")),
+                ("Mono dark", "#ffffff", ("#111827", "#ffffff", "#9ca3af", "#111827")), ("Mono light", "#111827", ("#ffffff", "#111827", "#4b5563", "#ffffff"))]
+    for i, (label, bg, scheme) in enumerate(variants):
+        x = 60 + i * 280
+        c.setFillColor(colors.HexColor(bg))
+        c.roundRect(x, 340, 250, 330, 16, stroke=1 if bg == "#ffffff" else 0, fill=1)
+        logo(x + 45, 420, 160, *scheme)
+        c.setFillColor(colors.HexColor("#6b7280"))
+        c.setFont("Helvetica", 14)
+        c.drawString(x, 315, label)
+    c.setFillColor(colors.HexColor("#111827"))
+    c.setFont("Helvetica-Bold", 28)
+    c.drawString(60, 720, "Cloud · logo concepts v4")
+    for i, hex_color in enumerate(["#2563eb", "#1d4ed8", "#bfdbfe", "#10b981", "#f59e0b", "#111827"]):
+        x = 60 + i * 120
+        c.setFillColor(colors.HexColor(hex_color))
+        c.rect(x, 170, 100, 100, stroke=0, fill=1)
+        c.setFillColor(colors.HexColor("#374151"))
+        c.setFont("Helvetica", 12)
+        c.drawString(x, 150, hex_color.upper())
+    logo(800, 120, 140, "#2563eb", "#ffffff", "#bfdbfe", "#1d4ed8")
+    c.setFillColor(colors.HexColor("#111827"))
+    c.setFont("Helvetica-Bold", 64)
+    c.drawString(950, 165, "Cloud")
+    c.showPage()
+    c.save()
+
+
+def build_design_extras() -> list[Path]:
+    d = OUT / "Design"
+    copy(UNSPLASH / f"{PRODUCT_PHOTO_ID}.jpg", d / "Product Photoshoot.jpg")
+    write_psd(d / "Website Mockup.psd")
+    write_sketch(d / "Mobile App.sketch")
+    write_ai(d / "Logo Concepts.ai")
+    return [d / name for name in ["Product Photoshoot.jpg", "Website Mockup.psd", "Mobile App.sketch", "Logo Concepts.ai"]]
+
+
+def build_extras() -> None:
+    made = [*build_people(), *build_audio(), *build_videos(), *build_presentations(), *build_invoices(), *build_marketing(), *build_design_extras()]
+    for f in made:
+        stamp(f, random_date())
+    for folder in ["People", "Audio", "Videos", "Documents/Invoices", "Documents", "Design"]:
+        stamp(OUT / folder, random_date())
+
+
 def main() -> None:
     ensure_sources()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -2049,6 +3222,7 @@ def main() -> None:
     build_shared()
     build_root()
     stamp_folders()
+    build_extras()
     total = sum(f.stat().st_size for f in OUT.rglob("*") if f.is_file())
     print(f"built {OUT}: {sum(1 for f in OUT.rglob('*') if f.is_file())} files, {total / 1e6:.1f} MB")
 

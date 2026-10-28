@@ -9,7 +9,10 @@ The main dataset is in the `demo/` folder. It contains realistic sample files
 in many formats:
 
 - documents: PDF, DOCX, ODT, RTF, Markdown, HTML and TXT;
-- images and design assets: JPG, PNG, WebP, SVG, GIF and PSD;
+- presentations: PPTX and ODP;
+- images and design assets: JPG, PNG, WebP, SVG, GIF, PSD, Sketch and AI;
+- avatar portraits for the fictional team;
+- audio (MP3, M4A, FLAC, WAV) and video (MP4, MOV, WebM, MKV);
 - archives: ZIP, TAR, 7z, gzip, bzip2, xz and other formats;
 - resources: CSV, JSON, YAML, XML, SQLite, vCard and iCalendar;
 - a small sample service used to demonstrate source-code browsing.
