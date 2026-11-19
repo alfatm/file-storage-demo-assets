@@ -27,3 +27,5 @@ workspace: folders, documents, photos, archives, spreadsheets, video and shared
 files.
 
 All people, companies, invoices and figures in the documents are fictional.
+Where each file comes from, and under which licence, is listed in
+`demo/README.md` («Data»).
